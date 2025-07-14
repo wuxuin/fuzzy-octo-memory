@@ -1,231 +1,766 @@
-local CoreGui = game:GetService("StarterGui")
+-- Services
 local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
+local RunService = game:GetService("RunService")
 
-local function isNumber(str)
-  if tonumber(str) ~= nil or str == 'inf' then
-    return true
-  end
-end
+-- Constants
+local BACKGROUND_COLOR = Color3.fromRGB(30, 30, 30)
+local ACCENT_COLOR = Color3.fromRGB(60, 120, 216)
+local TEXT_COLOR = Color3.fromRGB(255, 255, 255)
+local SECONDARY_COLOR = Color3.fromRGB(45, 45, 45)
+local HOVER_COLOR = Color3.fromRGB(70, 130, 226)
 
-getgenv().HitboxSize = 15
-getgenv().HitboxTransparency = 0.9
+-- Create UI Framework
+local MinimalistUI = {}
+MinimalistUI.__index = MinimalistUI
 
-getgenv().HitboxStatus = false
-getgenv().TeamCheck = false
-
-getgenv().Walkspeed = game:GetService("Players").LocalPlayer.Character.Humanoid.WalkSpeed
-getgenv().Jumppower = game:GetService("Players").LocalPlayer.Character.Humanoid.JumpPower
-
-getgenv().TPSpeed = 3
-getgenv().TPWalk = false
-
---// UI
-
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/Vcsk/UI-Library/main/Source/MyUILib(Unamed).lua"))();
-local Window = Library:Create("Hitbox Expander")
-
-local ToggleGui = Instance.new("ScreenGui")
-local Toggle = Instance.new("TextButton")
-
-ToggleGui.Name = "ToggleGui_HE"
-ToggleGui.Parent = game.CoreGui
-
-Toggle.Name = "Toggle"
-Toggle.Parent = ToggleGui
-Toggle.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
-Toggle.BackgroundTransparency = 0.660
-Toggle.Position = UDim2.new(0, 0, 0.454706937, 0)
-Toggle.Size = UDim2.new(0.0650164187, 0, 0.0888099447, 0)
-Toggle.Font = Enum.Font.SourceSans
-Toggle.Text = "Toggle"
-Toggle.TextScaled = true
-Toggle.TextColor3 = Color3.fromRGB(40, 40, 40)
-Toggle.TextSize = 24.000
-Toggle.TextXAlignment = Enum.TextXAlignment.Left
-Toggle.Active = true
-Toggle.Draggable = true
-Toggle.MouseButton1Click:connect(function()
-    Library:ToggleUI()
-end)
-
-local HomeTab = Window:Tab("Home","rbxassetid://10888331510")
-local PlayerTab = Window:Tab("Players","rbxassetid://12296135476")
-local VisualTab = Window:Tab("Visuals","rbxassetid://12308581351")
-
-HomeTab:InfoLabel("only works on some games!")
-
-HomeTab:Section("Settings")
-
-HomeTab:TextBox("Hitbox Size", function(value)
-    getgenv().HitboxSize = value
-end)
-
-HomeTab:TextBox("Hitbox Transparency", function(number)
-    getgenv().HitboxTransparency = number
-end)
-
-HomeTab:Section("Main")
-
-HomeTab:Toggle("Status: ", function(state)
-	getgenv().HitboxStatus = state
-    game:GetService('RunService').RenderStepped:connect(function()
-		if HitboxStatus == true and TeamCheck == false then
-			for i,v in next, game:GetService('Players'):GetPlayers() do
-				if v.Name ~= game:GetService('Players').LocalPlayer.Name then
-					pcall(function()
-						v.Character.HumanoidRootPart.Size = Vector3.new(HitboxSize, HitboxSize, HitboxSize)
-						v.Character.HumanoidRootPart.Transparency = HitboxTransparency
-						v.Character.HumanoidRootPart.BrickColor = BrickColor.new("Really black")
-						v.Character.HumanoidRootPart.Material = "Neon"
-						v.Character.HumanoidRootPart.CanCollide = false
-					end)
-				end
-			end
-		elseif HitboxStatus == true and TeamCheck == true then
-			for i,v in next, game:GetService('Players'):GetPlayers() do
-				if game:GetService('Players').LocalPlayer.Team ~= v.Team then
-					pcall(function()
-						v.Character.HumanoidRootPart.Size = Vector3.new(HitboxSize, HitboxSize, HitboxSize)
-						v.Character.HumanoidRootPart.Transparency = HitboxTransparency
-						v.Character.HumanoidRootPart.BrickColor = BrickColor.new("Really black")
-						v.Character.HumanoidRootPart.Material = "Neon"
-						v.Character.HumanoidRootPart.CanCollide = false
-					end)
-				end
-			end
-		else
-		    for i,v in next, game:GetService('Players'):GetPlayers() do
-				if v.Name ~= game:GetService('Players').LocalPlayer.Name then
-					pcall(function()
-						v.Character.HumanoidRootPart.Size = Vector3.new(2,2,1)
-						v.Character.HumanoidRootPart.Transparency = 1
-						v.Character.HumanoidRootPart.BrickColor = BrickColor.new("Medium stone grey")
-						v.Character.HumanoidRootPart.Material = "Plastic"
-						v.Character.HumanoidRootPart.CanCollide = false
-					end)
-				end
-			end
-		end
-	end)
-end)
-
-HomeTab:Toggle("Team Check", function(state)
-    getgenv().TeamCheck = state
-end)
-
-HomeTab:Keybind("Toggle UI", Enum.KeyCode.F, function()
-    Library:ToggleUI()
-end)
-
-PlayerTab:TextBox("WalkSpeed", function(value)
-    getgenv().Walkspeed = value
-    pcall(function()
-        game:GetService("Players").LocalPlayer.Character.Humanoid.WalkSpeed = value
-    end)
-end)
-
-PlayerTab:Toggle("Loop WalkSpeed", function(state)
-    getgenv().loopW = state
-    game:GetService("RunService").Heartbeat:Connect(function()
-        if loopW == true then
-            pcall(function()
-                game:GetService("Players").LocalPlayer.Character.Humanoid.WalkSpeed = Walkspeed
-            end)
-        end
-    end)
-end)
-
-PlayerTab:TextBox("JumpPower", function(value)
-    getgenv().Jumppower = value
-    pcall(function()
-        game:GetService("Players").LocalPlayer.Character.Humanoid.JumpPower = value
-    end)
-end)
-
-PlayerTab:Toggle("Loop JumpPower", function(state)
-    getgenv().loopJ = state
-    game:GetService("RunService").Heartbeat:Connect(function()
-        if loopJ == true then
-            pcall(function()
-                game:GetService("Players").LocalPlayer.Character.Humanoid.JumpPower = Jumppower
-            end)
-        end
-    end)
-end)
-
-PlayerTab:TextBox("TP Speed", function(value)
-getgenv().TPSpeed = value
-end)
-
-PlayerTab:Toggle("TP Walk", function(s)
-getgenv().TPWalk = s
-local hb = game:GetService("RunService").Heartbeat
-local player = game:GetService("Players")
-local lplr = player.LocalPlayer
-local chr = lplr.Character
-local hum = chr and chr:FindFirstChildWhichIsA("Humanoid")
-while getgenv().TPWalk and hb:Wait() and chr and hum and hum.Parent do
-  if hum.MoveDirection.Magnitude > 0 then
-    if getgenv().TPSpeed and isNumber(getgenv().TPSpeed) then
-      chr:TranslateBy(hum.MoveDirection * tonumber(getgenv().TPSpeed))
-    else
-      chr:TranslateBy(hum.MoveDirection)
+-- Utility Functions
+local function createInstance(className, properties)
+    local instance = Instance.new(className)
+    for property, value in pairs(properties) do
+        instance[property] = value
     end
-  end
+    return instance
 end
-end)
 
-PlayerTab:Slider("Fov", game.Workspace.CurrentCamera.FieldOfView,120, function(v)
-     game.Workspace.CurrentCamera.FieldOfView = v
-end)
+local function createRoundedFrame(properties)
+    local frame = createInstance("Frame", properties)
+    local uiCorner = createInstance("UICorner", {
+        CornerRadius = UDim.new(0, 6),
+        Parent = frame
+    })
+    return frame
+end
 
-PlayerTab:Toggle("Noclip", function(s)
-    getgenv().Noclip = s
-    game:GetService("RunService").Heartbeat:Connect(function()
-        if Noclip == true then
-            game:GetService("RunService").Stepped:wait()
-            game.Players.LocalPlayer.Character.Head.CanCollide = false
-            game.Players.LocalPlayer.Character.Torso.CanCollide = false
+local function createShadow(parent)
+    local shadow = createInstance("ImageLabel", {
+        Name = "Shadow",
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, -15, 0, -15),
+        Size = UDim2.new(1, 30, 1, 30),
+        ZIndex = parent.ZIndex - 1,
+        Image = "rbxassetid://5554236805",
+        ImageColor3 = Color3.fromRGB(0, 0, 0),
+        ImageTransparency = 0.6,
+        ScaleType = Enum.ScaleType.Slice,
+        SliceCenter = Rect.new(23, 23, 277, 277),
+        Parent = parent
+    })
+    return shadow
+end
+
+-- Main Framework Functions
+function MinimalistUI.new(title)
+    local self = setmetatable({}, MinimalistUI)
+    
+    -- Create main GUI
+    self.ScreenGui = createInstance("ScreenGui", {
+        Name = "MinimalistUI",
+        Parent = CoreGui,
+        ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+        ResetOnSpawn = false
+    })
+    
+    -- Create main frame
+    self.MainFrame = createRoundedFrame({
+        Name = "MainFrame",
+        BackgroundColor3 = BACKGROUND_COLOR,
+        Position = UDim2.new(0.5, -150, 0.5, -125),
+        Size = UDim2.new(0, 300, 0, 250),
+        ZIndex = 2,
+        Parent = self.ScreenGui
+    })
+    
+    -- Add shadow
+    createShadow(self.MainFrame)
+    
+    -- Create title bar
+    self.TitleBar = createRoundedFrame({
+        Name = "TitleBar",
+        BackgroundColor3 = ACCENT_COLOR,
+        Size = UDim2.new(1, 0, 0, 30),
+        ZIndex = 3,
+        Parent = self.MainFrame
+    })
+    
+    -- Title text
+    self.TitleText = createInstance("TextLabel", {
+        Name = "TitleText",
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 10, 0, 0),
+        Size = UDim2.new(0.7, 0, 1, 0),
+        ZIndex = 3,
+        Font = Enum.Font.GothamSemibold,
+        Text = title or "Minimalist UI",
+        TextColor3 = TEXT_COLOR,
+        TextSize = 14,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = self.TitleBar
+    })
+    
+    -- Close button
+    self.CloseButton = createInstance("TextButton", {
+        Name = "CloseButton",
+        BackgroundTransparency = 1,
+        Position = UDim2.new(1, -30, 0, 0),
+        Size = UDim2.new(0, 30, 1, 0),
+        ZIndex = 3,
+        Font = Enum.Font.GothamSemibold,
+        Text = "×",
+        TextColor3 = TEXT_COLOR,
+        TextSize = 20,
+        Parent = self.TitleBar
+    })
+    
+    -- Minimize button
+    self.MinimizeButton = createInstance("TextButton", {
+        Name = "MinimizeButton",
+        BackgroundTransparency = 1,
+        Position = UDim2.new(1, -60, 0, 0),
+        Size = UDim2.new(0, 30, 1, 0),
+        ZIndex = 3,
+        Font = Enum.Font.GothamSemibold,
+        Text = "−",
+        TextColor3 = TEXT_COLOR,
+        TextSize = 20,
+        Parent = self.TitleBar
+    })
+    
+    -- Content frame
+    self.ContentFrame = createInstance("Frame", {
+        Name = "ContentFrame",
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 0, 0, 30),
+        Size = UDim2.new(1, 0, 1, -30),
+        ZIndex = 2,
+        ClipsDescendants = true,
+        Parent = self.MainFrame
+    })
+    
+    -- Tab container
+    self.TabContainer = createInstance("Frame", {
+        Name = "TabContainer",
+        BackgroundColor3 = SECONDARY_COLOR,
+        Position = UDim2.new(0, 5, 0, 5),
+        Size = UDim2.new(0.3, -10, 1, -10),
+        ZIndex = 2,
+        Parent = self.ContentFrame
+    })
+    
+    local tabContainerCorner = createInstance("UICorner", {
+        CornerRadius = UDim.new(0, 6),
+        Parent = self.TabContainer
+    })
+    
+    -- Tab content frame
+    self.TabContentFrame = createInstance("Frame", {
+        Name = "TabContentFrame",
+        BackgroundColor3 = SECONDARY_COLOR,
+        Position = UDim2.new(0.3, 5, 0, 5),
+        Size = UDim2.new(0.7, -10, 1, -10),
+        ZIndex = 2,
+        Parent = self.ContentFrame
+    })
+    
+    local tabContentCorner = createInstance("UICorner", {
+        CornerRadius = UDim.new(0, 6),
+        Parent = self.TabContentFrame
+    })
+    
+    -- Tab scroll frame
+    self.TabScrollFrame = createInstance("ScrollingFrame", {
+        Name = "TabScrollFrame",
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 0, 0, 0),
+        Size = UDim2.new(1, 0, 1, 0),
+        ZIndex = 2,
+        CanvasSize = UDim2.new(0, 0, 0, 0),
+        ScrollBarThickness = 2,
+        ScrollBarImageColor3 = ACCENT_COLOR,
+        Parent = self.TabContainer
+    })
+    
+    local tabListLayout = createInstance("UIListLayout", {
+        Padding = UDim.new(0, 5),
+        HorizontalAlignment = Enum.HorizontalAlignment.Center,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Parent = self.TabScrollFrame
+    })
+    
+    -- Tab content scroll frame
+    self.ContentScrollFrame = createInstance("ScrollingFrame", {
+        Name = "ContentScrollFrame",
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 5, 0, 5),
+        Size = UDim2.new(1, -10, 1, -10),
+        ZIndex = 2,
+        CanvasSize = UDim2.new(0, 0, 0, 0),
+        ScrollBarThickness = 2,
+        ScrollBarImageColor3 = ACCENT_COLOR,
+        Parent = self.TabContentFrame
+    })
+    
+    local contentPadding = createInstance("UIPadding", {
+        PaddingLeft = UDim.new(0, 5),
+        PaddingRight = UDim.new(0, 5),
+        PaddingTop = UDim.new(0, 5),
+        PaddingBottom = UDim.new(0, 5),
+        Parent = self.ContentScrollFrame
+    })
+    
+    local contentListLayout = createInstance("UIListLayout", {
+        Padding = UDim.new(0, 8),
+        HorizontalAlignment = Enum.HorizontalAlignment.Center,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Parent = self.ContentScrollFrame
+    })
+    
+    -- Mobile toggle button
+    self.MobileToggle = createRoundedFrame({
+        Name = "MobileToggle",
+        BackgroundColor3 = ACCENT_COLOR,
+        Position = UDim2.new(0, 10, 0, 10),
+        Size = UDim2.new(0, 40, 0, 40),
+        ZIndex = 10,
+        Visible = false,
+        Parent = self.ScreenGui
+    })
+    
+    self.MobileToggleIcon = createInstance("TextLabel", {
+        Name = "MobileToggleIcon",
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 1, 0),
+        ZIndex = 11,
+        Font = Enum.Font.GothamBold,
+        Text = "≡",
+        TextColor3 = TEXT_COLOR,
+        TextSize = 25,
+        Parent = self.MobileToggle
+    })
+    
+    -- Set up variables
+    self.Tabs = {}
+    self.TabButtons = {}
+    self.ActiveTab = nil
+    self.Minimized = false
+    self.IsMobile = false
+    self.MainFrameSize = self.MainFrame.Size
+    self.MainFramePosition = self.MainFrame.Position
+    
+    -- Check if on mobile device
+    if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled and not UserInputService.MouseEnabled then
+        self.IsMobile = true
+        self.MobileToggle.Visible = true
+    end
+    
+    -- Set up events
+    self:setupEvents()
+    self:makeDraggable(self.MainFrame, self.TitleBar)
+    
+    return self
+end
+
+function MinimalistUI:setupEvents()
+    -- Close button
+    self.CloseButton.MouseButton1Click:Connect(function()
+        self.ScreenGui:Destroy()
+    end)
+    
+    -- Minimize button
+    self.MinimizeButton.MouseButton1Click:Connect(function()
+        self:toggleMinimize()
+    end)
+    
+    -- Mobile toggle
+    self.MobileToggle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            self:toggleVisibility()
         end
     end)
-end)
+    
+    -- Auto-adjust scroll frame canvas size
+    self.ContentScrollFrame.ChildAdded:Connect(function()
+        self:updateCanvasSize()
+    end)
+    self.ContentScrollFrame.ChildRemoved:Connect(function()
+        self:updateCanvasSize()
+    end)
+    
+    self.TabScrollFrame.ChildAdded:Connect(function()
+        local totalHeight = 0
+        for _, child in pairs(self.TabScrollFrame:GetChildren()) do
+            if child:IsA("Frame") or child:IsA("TextButton") then
+                totalHeight = totalHeight + child.Size.Y.Offset + 5
+            end
+        end
+        self.TabScrollFrame.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
+    end)
+end
 
-PlayerTab:Toggle("Infinite Jump", function(s)
-getgenv().InfJ = s
-    game:GetService("UserInputService").JumpRequest:connect(function()
-        if InfJ == true then
-            game:GetService("Players").LocalPlayer.Character:FindFirstChildOfClass'Humanoid':ChangeState("Jumping")
+function MinimalistUI:makeDraggable(frame, dragArea)
+    dragArea = dragArea or frame
+    
+    local dragging = false
+    local dragInput
+    local dragStart
+    local startPos
+    
+    local function updateDrag(input)
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+    
+    dragArea.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+            
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
         end
     end)
-end)
-
-PlayerTab:Button("Rejoin", function()
-    game:GetService("TeleportService"):Teleport(game.PlaceId, game:GetService("Players").LocalPlayer)
-end)
-
-VisualTab:InfoLabel("Wait 3-10 seconds")
-
-VisualTab:Toggle("Character Highlight", function(state)
-getgenv().enabled = state --Toggle on/off
-getgenv().filluseteamcolor = true --Toggle fill color using player team color on/off
-getgenv().outlineuseteamcolor = true --Toggle outline color using player team color on/off
-getgenv().fillcolor = Color3.new(0, 0, 0) --Change fill color, no need to edit if using team color
-getgenv().outlinecolor = Color3.new(1, 1, 1) --Change outline color, no need to edit if using team color
-getgenv().filltrans = 0.5 --Change fill transparency
-getgenv().outlinetrans = 0.5 --Change outline transparency
-
-loadstring(game:HttpGet("https://raw.githubusercontent.com/Vcsk/RobloxScripts/main/Highlight-ESP.lua"))()
-end)
-
-if game.PlaceId == 3082002798 then
-    local GamesTab = Window:Tab("Games","rbxassetid://15426471035")
-	GamesTab:InfoLabel("Game: "..game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name)
-	GamesTab:Button("No Cooldown", function()
-	    for i, v in pairs(game:GetService('ReplicatedStorage')['Shared_Modules'].Tools:GetDescendants()) do
-		    if v:IsA('ModuleScript') then
-			    local Module = require(v)
-				Module.DEBOUNCE = 0
-			end
-		end
-	end)
+    
+    dragArea.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            updateDrag(input)
+        end
+    end)
 end
+
+function MinimalistUI:toggleMinimize()
+    self.Minimized = not self.Minimized
+    
+    if self.Minimized then
+        -- Save current size and position
+        self.MainFrameSize = self.MainFrame.Size
+        self.MainFramePosition = self.MainFrame.Position
+        
+        -- Minimize
+        TweenService:Create(self.MainFrame, TweenInfo.new(0.3), {
+            Size = UDim2.new(0, 300, 0, 30),
+            Position = UDim2.new(self.MainFramePosition.X.Scale, self.MainFramePosition.X.Offset, 
+                                self.MainFramePosition.Y.Scale, self.MainFramePosition.Y.Offset)
+        }):Play()
+        
+        self.ContentFrame.Visible = false
+        self.MinimizeButton.Text = "□"
+    else
+        -- Restore
+        TweenService:Create(self.MainFrame, TweenInfo.new(0.3), {
+            Size = self.MainFrameSize,
+            Position = self.MainFramePosition
+        }):Play()
+        
+        self.ContentFrame.Visible = true
+        self.MinimizeButton.Text = "−"
+    end
+end
+
+function MinimalistUI:toggleVisibility()
+    self.MainFrame.Visible = not self.MainFrame.Visible
+end
+
+function MinimalistUI:updateCanvasSize()
+    local contentHeight = 0
+    for _, child in pairs(self.ContentScrollFrame:GetChildren()) do
+        if child:IsA("Frame") or child:IsA("TextLabel") or child:IsA("TextButton") then
+            contentHeight = contentHeight + child.Size.Y.Offset + 8
+        end
+    end
+    self.ContentScrollFrame.CanvasSize = UDim2.new(0, 0, 0, contentHeight)
+end
+
+function MinimalistUI:Tab(name, icon)
+    -- Create tab button
+    local tabButton = createInstance("TextButton", {
+        Name = name.."Tab",
+        BackgroundColor3 = SECONDARY_COLOR,
+        Size = UDim2.new(0.9, 0, 0, 30),
+        ZIndex = 3,
+        Font = Enum.Font.Gotham,
+        Text = "",
+        TextColor3 = TEXT_COLOR,
+        TextSize = 14,
+        AutoButtonColor = false,
+        Parent = self.TabScrollFrame
+    })
+    
+    local tabCorner = createInstance("UICorner", {
+        CornerRadius = UDim.new(0, 4),
+        Parent = tabButton
+    })
+    
+    -- Tab icon
+    local tabIcon
+    if icon then
+        tabIcon = createInstance("ImageLabel", {
+            Name = "Icon",
+            BackgroundTransparency = 1,
+            Position = UDim2.new(0, 5, 0, 5),
+            Size = UDim2.new(0, 20, 0, 20),
+            ZIndex = 3,
+            Image = icon,
+            Parent = tabButton
+        })
+    end
+    
+    -- Tab text
+    local tabText = createInstance("TextLabel", {
+        Name = "Text",
+        BackgroundTransparency = 1,
+        Position = UDim2.new(icon and 0.15 or 0, icon and 5 or 10, 0, 0),
+        Size = UDim2.new(icon and 0.85 or 1, icon and -10 or -10, 1, 0),
+        ZIndex = 3,
+        Font = Enum.Font.Gotham,
+        Text = name,
+        TextColor3 = TEXT_COLOR,
+        TextSize = 12,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = tabButton
+    })
+    
+    -- Create tab content frame
+    local tabContent = createInstance("Frame", {
+        Name = name.."Content",
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 1, 0),
+        ZIndex = 2,
+        Visible = false,
+        Parent = self.ContentScrollFrame
+    })
+    
+    -- Tab button hover effect
+    tabButton.MouseEnter:Connect(function()
+        if self.ActiveTab ~= name then
+            TweenService:Create(tabButton, TweenInfo.new(0.2), {
+                BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+            }):Play()
+        end
+    end)
+    
+    tabButton.MouseLeave:Connect(function()
+        if self.ActiveTab ~= name then
+            TweenService:Create(tabButton, TweenInfo.new(0.2), {
+                BackgroundColor3 = SECONDARY_COLOR
+            }):Play()
+        end
+    end)
+    
+    -- Tab button click
+    tabButton.MouseButton1Click:Connect(function()
+        self:SelectTab(name)
+    end)
+    
+    -- Store tab
+    self.Tabs[name] = tabContent
+    self.TabButtons[name] = tabButton
+    
+    -- Select first tab by default
+    if not self.ActiveTab then
+        self:SelectTab(name)
+    end
+    
+    -- Return tab methods
+    local tab = {}
+    
+    function tab:Section(title)
+        local sectionFrame = createRoundedFrame({
+            Name = title.."Section",
+            BackgroundColor3 = Color3.fromRGB(35, 35, 35),
+            Size = UDim2.new(1, 0, 0, 30),
+            ZIndex = 3,
+            AutomaticSize = Enum.AutomaticSize.Y,
+            Parent = tabContent
+        })
+        
+        local sectionTitle = createInstance("TextLabel", {
+            Name = "Title",
+            BackgroundTransparency = 1,
+            Position = UDim2.new(0, 10, 0, 0),
+            Size = UDim2.new(1, -10, 0, 25),
+            ZIndex = 3,
+            Font = Enum.Font.GothamSemibold,
+            Text = title,
+            TextColor3 = TEXT_COLOR,
+            TextSize = 12,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            Parent = sectionFrame
+        })
+        
+        local sectionContent = createInstance("Frame", {
+            Name = "Content",
+            BackgroundTransparency = 1,
+            Position = UDim2.new(0, 0, 0, 25),
+            Size = UDim2.new(1, 0, 0, 0),
+            ZIndex = 3,
+            AutomaticSize = Enum.AutomaticSize.Y,
+            Parent = sectionFrame
+        })
+        
+        local sectionPadding = createInstance("UIPadding", {
+            PaddingLeft = UDim.new(0, 5),
+            PaddingRight = UDim.new(0, 5),
+            PaddingBottom = UDim.new(0, 5),
+            Parent = sectionContent
+        })
+        
+        local sectionListLayout = createInstance("UIListLayout", {
+            Padding = UDim.new(0, 5),
+            SortOrder = Enum.SortOrder.LayoutOrder,
+            Parent = sectionContent
+        })
+        
+        -- Update canvas size when elements are added
+        sectionContent.ChildAdded:Connect(function()
+            task.wait()
+            self:updateCanvasSize()
+        end)
+        
+        -- Return section methods
+        local section = {}
+        
+        function section:Button(text, callback)
+            callback = callback or function() end
+            
+            local button = createRoundedFrame({
+                Name = text.."Button",
+                BackgroundColor3 = ACCENT_COLOR,
+                Size = UDim2.new(1, -10, 0, 30),
+                ZIndex = 4,
+                Parent = sectionContent
+            })
+            
+            local buttonText = createInstance("TextLabel", {
+                Name = "Text",
+                BackgroundTransparency = 1,
+                Size = UDim2.new(1, 0, 1, 0),
+                ZIndex = 4,
+                Font = Enum.Font.Gotham,
+                Text = text,
+                TextColor3 = TEXT_COLOR,
+                TextSize = 12,
+                Parent = button
+            })
+            
+            -- Make clickable
+            button.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    TweenService:Create(button, TweenInfo.new(0.1), {
+                        BackgroundColor3 = HOVER_COLOR
+                    }):Play()
+                    callback()
+                end
+            end)
+            
+            button.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    TweenService:Create(button, TweenInfo.new(0.1), {
+                        BackgroundColor3 = ACCENT_COLOR
+                    }):Play()
+                end
+            end)
+            
+            return button
+        end
+        
+        function section:Toggle(text, default, callback)
+            callback = callback or function() end
+            default = default or false
+            
+            local toggle = createInstance("Frame", {
+                Name = text.."Toggle",
+                BackgroundTransparency = 1,
+                Size = UDim2.new(1, -10, 0, 30),
+                ZIndex = 4,
+                Parent = sectionContent
+            })
+            
+            local toggleText = createInstance("TextLabel", {
+                Name = "Text",
+                BackgroundTransparency = 1,
+                Position = UDim2.new(0, 5, 0, 0),
+                Size = UDim2.new(0.7, -10, 1, 0),
+                ZIndex = 4,
+                Font = Enum.Font.Gotham,
+                Text = text,
+                TextColor3 = TEXT_COLOR,
+                TextSize = 12,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                Parent = toggle
+            })
+            
+            local toggleButton = createRoundedFrame({
+                Name = "Button",
+                BackgroundColor3 = default and ACCENT_COLOR or Color3.fromRGB(80, 80, 80),
+                Position = UDim2.new(1, -40, 0.5, -10),
+                Size = UDim2.new(0, 35, 0, 20),
+                ZIndex = 4,
+                Parent = toggle
+            })
+            
+            local toggleIndicator = createRoundedFrame({
+                Name = "Indicator",
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                Position = UDim2.new(default and 0.6 or 0, default and 0 or 2, 0.5, -8),
+                Size = UDim2.new(0, 16, 0, 16),
+                ZIndex = 5,
+                Parent = toggleButton
+            })
+            
+            local toggleValue = default
+            
+            local function updateToggle()
+                toggleValue = not toggleValue
+                TweenService:Create(toggleButton, TweenInfo.new(0.2), {
+                    BackgroundColor3 = toggleValue and ACCENT_COLOR or Color3.fromRGB(80, 80, 80)
+                }):Play()
+                TweenService:Create(toggleIndicator, TweenInfo.new(0.2), {
+                    Position = toggleValue and UDim2.new(0.6, 0, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
+                }):Play()
+                callback(toggleValue)
+            end
+            
+            toggleButton.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    updateToggle()
+                end
+            end)
+            
+            -- Return toggle with methods
+            local toggleObj = {
+                Instance = toggle,
+                Value = toggleValue,
+                Set = function(self, value)
+                    if value ~= toggleValue then
+                        updateToggle()
+                    end
+                end
+            }
+            
+            return toggleObj
+        end
+        
+        function section:Slider(text, min, max, default, callback)
+            callback = callback or function() end
+            min = min or 0
+            max = max or 100
+            default = default or min
+            default = math.clamp(default, min, max)
+            
+            local slider = createInstance("Frame", {
+                Name = text.."Slider",
+                BackgroundTransparency = 1,
+                Size = UDim2.new(1, -10, 0, 45),
+                ZIndex = 4,
+                Parent = sectionContent
+            })
+            
+            local sliderText = createInstance("TextLabel", {
+                Name = "Text",
+                BackgroundTransparency = 1,
+                Position = UDim2.new(0, 5, 0, 0),
+                Size = UDim2.new(1, -65, 0, 20),
+                ZIndex = 4,
+                Font = Enum.Font.Gotham,
+                Text = text,
+                TextColor3 = TEXT_COLOR,
+                TextSize = 12,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                Parent = slider
+            })
+            
+            local valueText = createInstance("TextLabel", {
+                Name = "Value",
+                BackgroundTransparency = 1,
+                Position = UDim2.new(1, -55, 0, 0),
+                Size = UDim2.new(0, 50, 0, 20),
+                ZIndex = 4,
+                Font = Enum.Font.Gotham,
+                Text = tostring(default),
+                TextColor3 = TEXT_COLOR,
+                TextSize = 12,
+                TextXAlignment = Enum.TextXAlignment.Right,
+                Parent = slider
+            })
+            
+            local sliderBar = createRoundedFrame({
+                Name = "Bar",
+                BackgroundColor3 = Color3.fromRGB(60, 60, 60),
+                Position = UDim2.new(0, 5, 0, 25),
+                Size = UDim2.new(1, -10, 0, 6),
+                ZIndex = 4,
+                Parent = slider
+            })
+            
+            local sliderFill = createRoundedFrame({
+                Name = "Fill",
+                BackgroundColor3 = ACCENT_COLOR,
+                Size = UDim2.new((default - min) / (max - min), 0, 1, 0),
+                ZIndex = 5,
+                Parent = sliderBar
+            })
+            
+            local sliderButton = createRoundedFrame({
+                Name = "Button",
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                Position = UDim2.new((default - min) / (max - min), -6, 0.5, -6),
+                Size = UDim2.new(0, 12, 0, 12),
+                ZIndex = 6,
+                Parent = sliderBar
+            })
+            
+            local currentValue = default
+            
+            local function updateSlider(value)
+                value = math.clamp(value, min, max)
+                currentValue = value
+                valueText.Text = tostring(math.floor(value * 100) / 100)
+                
+                local percent = (value - min) / (max - min)
+                TweenService:Create(sliderFill, TweenInfo.new(0.1), {
+                    Size = UDim2.new(percent, 0, 1, 0)
+                }):Play()
+                TweenService:Create(sliderButton, TweenInfo.new(0.1), {
+                    Position = UDim2.new(percent, -6, 0.5, -6)
+                }):Play()
+                
+                callback(value)
+            end
+            
+            local dragging = false
+            
+            sliderBar.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    dragging = true
+                    local percent = math.clamp((input.Position.X - sliderBar.AbsolutePosition.X) / sliderBar.AbsoluteSize.X, 0, 1)
+                    updateSlider(min + (max - min) * percent)
+                end
+            end)
+            
+            sliderButton.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    dragging = true
+                end
+            end)
+            
+            UserInputService.InputEnded:Connect(function(input)
+                if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+                    dragging = false
+                end
+            end)
+            
+            UserInputService.InputChanged:Connect(function(input)
+                if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                    local percent = math.clamp((input.Position.X - sliderBar.AbsolutePosition.X) / sliderBar.Ab

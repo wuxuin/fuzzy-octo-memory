@@ -1,13 +1,3 @@
---[[
-
-Open source
-Made by !vcsk0#1516
-Credits to me
-
-Credits to the Owner Who Made The ESP Script
-
-]]
-
 local CoreGui = game:GetService("StarterGui")
 local Players = game:GetService("Players")
 

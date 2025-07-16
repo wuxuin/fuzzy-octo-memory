@@ -1,1 +1,943 @@
+-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
+local TweenService = game:GetService("TweenService")
 
+-- Variables
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+local SilentAimEnabled = true
+local FOV = 500 -- Field of view for target selection (in pixels)
+local MaxDistance = 1000 -- Maximum distance to target
+local TeamCheck = false -- Set to true to avoid targeting teammates
+local VisibilityCheck = false -- Set to true to check if target is visible
+local TargetPart = "Head" -- Which part to aim at (Head, HumanoidRootPart, Torso)
+local ShowFOV = true -- Show FOV circle
+local FOVColor = Color3.fromRGB(255, 255, 255) -- White color for FOV circle
+local TargetColor = Color3.fromRGB(0, 255, 0) -- Green color for target highlight
+local IsMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+
+-- Visual Feedback
+local CurrentTarget = nil
+local CurrentHighlight = nil
+local FOVCircle = nil
+
+-- Remote tracking
+local HookedRemotes = {}
+local RemoteCalls = {}
+
+-- Create FOV circle
+local function CreateFOVCircle()
+    if not FOVCircle then
+        FOVCircle = Drawing.new("Circle")
+        FOVCircle.Thickness = 2
+        FOVCircle.NumSides = 36
+        FOVCircle.Radius = FOV
+        FOVCircle.Filled = false
+        FOVCircle.Visible = ShowFOV
+        FOVCircle.ZIndex = 999
+        FOVCircle.Transparency = 1
+        FOVCircle.Color = FOVColor
+    end
+    
+    -- Update position
+    if FOVCircle then
+        FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    end
+end
+
+-- Functions
+local function IsVisible(part)
+    if not VisibilityCheck then return true end
+    
+    local origin = Camera.CFrame.Position
+    local direction = (part.Position - origin).Unit
+    local ray = Ray.new(origin, direction * MaxDistance)
+    local hit, position = Workspace:FindPartOnRayWithIgnoreList(ray, {LocalPlayer.Character, Camera})
+    return hit and hit:IsDescendantOf(part.Parent)
+end
+
+local function GetTargetPart(character)
+    if character:FindFirstChild(TargetPart) then
+        return character[TargetPart]
+    elseif TargetPart == "Torso" and character:FindFirstChild("UpperTorso") then
+        return character.UpperTorso
+    elseif character:FindFirstChild("HumanoidRootPart") then
+        return character.HumanoidRootPart
+    elseif character:FindFirstChild("Head") then
+        return character.Head
+    else
+        -- Find any valid part
+        for _, part in pairs(character:GetChildren()) do
+            if part:IsA("BasePart") then
+                return part
+            end
+        end
+    end
+    return nil
+end
+
+local function GetClosestPlayerToCursor()
+    local ClosestPlayer = nil
+    local ShortestDistance = FOV
+    
+    for _, Player in pairs(Players:GetPlayers()) do
+        if Player ~= LocalPlayer then
+            -- Team check
+            if not TeamCheck or Player.Team ~= LocalPlayer.Team then
+                local Character = Player.Character
+                if Character and Character:FindFirstChild("Humanoid") and Character.Humanoid.Health > 0 then
+                    local HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart")
+                    local TargetPart = GetTargetPart(Character)
+                    
+                    if HumanoidRootPart and TargetPart then
+                        -- Check if in range
+                        local Distance = (LocalPlayer.Character.HumanoidRootPart.Position - HumanoidRootPart.Position).Magnitude
+                        if Distance <= MaxDistance then
+                            -- Check if on screen
+                            local ScreenPosition, OnScreen = Camera:WorldToScreenPoint(TargetPart.Position)
+                            if OnScreen then
+                                -- Check if within FOV
+                                local ScreenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+                                local ScreenDistance = (Vector2.new(ScreenPosition.X, ScreenPosition.Y) - ScreenCenter).Magnitude
+                                
+                                if ScreenDistance < ShortestDistance then
+                                    -- Check visibility
+                                    if IsVisible(TargetPart) then
+                                        ClosestPlayer = Player
+                                        ShortestDistance = ScreenDistance
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    return ClosestPlayer
+end
+
+-- Remote detection and analysis
+local function analyzeRemoteParameters(remote, args)
+    -- Skip if already analyzed
+    if RemoteCalls[remote] and RemoteCalls[remote].analyzed then return end
+    
+    -- Initialize tracking for this remote if needed
+    if not RemoteCalls[remote] then
+        RemoteCalls[remote] = {
+            calls = 0,
+            possibleDirectionParams = {},
+            possiblePositionParams = {},
+            possibleHitPartParams = {},
+            analyzed = false
+        }
+    end
+    
+    -- Increment call counter
+    RemoteCalls[remote].calls = RemoteCalls[remote].calls + 1
+    
+    -- Analyze parameters
+    for i, arg in pairs(args) do
+        -- Check for Vector3 (possible direction or position)
+        if typeof(arg) == "Vector3" then
+            -- Check if it could be a direction (magnitude close to 1)
+            if math.abs(arg.Magnitude - 1) < 0.1 then
+                RemoteCalls[remote].possibleDirectionParams[i] = (RemoteCalls[remote].possibleDirectionParams[i] or 0) + 1
+            else
+                -- Could be a position
+                RemoteCalls[remote].possiblePositionParams[i] = (RemoteCalls[remote].possiblePositionParams[i] or 0) + 1
+            end
+        end
+        
+        -- Check for Instance (possible hit part)
+        if typeof(arg) == "Instance" and (arg:IsA("BasePart") or arg:IsA("Model")) then
+            RemoteCalls[remote].possibleHitPartParams[i] = (RemoteCalls[remote].possibleHitPartParams[i] or 0) + 1
+        end
+        
+        -- Check for CFrame (possible camera or hit position)
+        if typeof(arg) == "CFrame" then
+            RemoteCalls[remote].possiblePositionParams[i] = (RemoteCalls[remote].possiblePositionParams[i] or 0) + 1
+        end
+    end
+    
+    -- After a few calls, try to determine the parameter structure
+    if RemoteCalls[remote].calls >= 3 and not RemoteCalls[remote].analyzed then
+        local directionParam = nil
+        local positionParam = nil
+        local hitPartParam = nil
+        
+        -- Find most likely parameters
+        local maxDirCount = 0
+        local maxPosCount = 0
+        local maxPartCount = 0
+        
+        for param, count in pairs(RemoteCalls[remote].possibleDirectionParams) do
+            if count > maxDirCount then
+                maxDirCount = count
+                directionParam = param
+            end
+        end
+        
+        for param, count in pairs(RemoteCalls[remote].possiblePositionParams) do
+            if count > maxPosCount then
+                maxPosCount = count
+                positionParam = param
+            end
+        end
+        
+        for param, count in pairs(RemoteCalls[remote].possibleHitPartParams) do
+            if count > maxPartCount then
+                maxPartCount = count
+                hitPartParam = param
+            end
+        end
+        
+        -- If we found likely parameters, hook the remote
+        if directionParam or positionParam or hitPartParam then
+            RemoteCalls[remote].analyzed = true
+        end
+    end
+end
+
+-- Universal hooks for all shooting methods
+-- 1. Hook Raycast method
+local old_namecall
+old_namecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local args = {...}
+    local method = getnamecallmethod()
+    
+    -- Handle FireServer calls for remote events (analyze and potentially modify)
+    if method == "FireServer" and self:IsA("RemoteEvent") then
+        -- Analyze the parameters to detect shooting remotes
+        analyzeRemoteParameters(self, args)
+        
+        -- If silent aim is enabled and we have a target
+        if SilentAimEnabled and CurrentTarget and CurrentTarget.Character then
+            local targetPart = GetTargetPart(CurrentTarget.Character)
+            if targetPart then
+                -- Check for Vector3 parameters that could be directions or positions
+                for i, arg in pairs(args) do
+                    -- Modify direction vectors (normalized)
+                    if typeof(arg) == "Vector3" and math.abs(arg.Magnitude - 1) < 0.1 then
+                        -- This is likely a direction vector
+                        local origin = Camera.CFrame.Position
+                        args[i] = (targetPart.Position - origin).Unit
+                    end
+                    
+                    -- Modify position vectors that might be hit positions
+                    if typeof(arg) == "Vector3" and RemoteCalls[self] and 
+                       RemoteCalls[self].possiblePositionParams[i] and 
+                       RemoteCalls[self].possiblePositionParams[i] > 0 then
+                        args[i] = targetPart.Position
+                    end
+                    
+                    -- Modify CFrame parameters
+                    if typeof(arg) == "CFrame" then
+                        -- For camera CFrames or hit CFrames
+                        args[i] = CFrame.new(arg.Position, targetPart.Position)
+                    end
+                    
+                    -- Modify Instance parameters that might be hit parts
+                    if typeof(arg) == "Instance" and (arg:IsA("BasePart") or arg:IsA("Model")) and
+                       RemoteCalls[self] and RemoteCalls[self].possibleHitPartParams[i] and
+                       RemoteCalls[self].possibleHitPartParams[i] > 0 then
+                        args[i] = targetPart
+                    end
+                end
+            end
+        end
+    end
+    
+    -- Handle Raycast method (used in many FPS games)
+    if SilentAimEnabled and CurrentTarget and method == "Raycast" and checkcaller() == false then
+        local targetPart = GetTargetPart(CurrentTarget.Character)
+        
+        if targetPart and typeof(args[1]) == "Vector3" and typeof(args[2]) == "Vector3" then
+            local origin = args[1]
+            -- Modify the direction to point at the target
+            local direction = (targetPart.Position - origin).Unit * MaxDistance
+            args[2] = direction
+            
+            return old_namecall(self, unpack(args))
+        end
+    end
+    
+    -- Handle FindPartOnRayWithIgnoreList and FindPartOnRay
+    if SilentAimEnabled and CurrentTarget and 
+       (method == "FindPartOnRayWithIgnoreList" or method == "FindPartOnRay") and 
+       checkcaller() == false then
+        
+        local targetPart = GetTargetPart(CurrentTarget.Character)
+        if targetPart and typeof(args[1]) == "Ray" then
+            local origin = args[1].Origin
+            local direction = (targetPart.Position - origin).Unit * MaxDistance
+            args[1] = Ray.new(origin, direction)
+            
+            return old_namecall(self, unpack(args))
+        end
+    end
+    
+    return old_namecall(self, ...)
+end)
+
+-- 2. Hook FireServer for RemoteEvents
+local old_fireserver
+old_fireserver = hookfunction(Instance.new("RemoteEvent").FireServer, function(self, ...)
+    local args = {...}
+    
+    -- If silent aim is enabled and we have a target
+    if SilentAimEnabled and CurrentTarget and CurrentTarget.Character then
+        local targetPart = GetTargetPart(CurrentTarget.Character)
+        if targetPart then
+            -- Analyze parameters
+            analyzeRemoteParameters(self, args)
+            
+            -- Modify Vector3 parameters
+            for i, arg in pairs(args) do
+                if typeof(arg) == "Vector3" then
+                    -- If it's a normalized vector (direction)
+                    if math.abs(arg.Magnitude - 1) < 0.1 then
+                        args[i] = (targetPart.Position - Camera.CFrame.Position).Unit
+                    end
+                    -- If it might be a position based on our analysis
+                    elseif RemoteCalls[self] and RemoteCalls[self].possiblePositionParams[i] and 
+                           RemoteCalls[self].possiblePositionParams[i] > 0 then
+                        args[i] = targetPart.Position
+                    end
+                end
+                
+                -- Modify CFrame parameters
+                if typeof(arg) == "CFrame" then
+                    args[i] = CFrame.new(arg.Position, targetPart.Position)
+                end
+                
+                -- Modify Instance parameters
+                if typeof(arg) == "Instance" and (arg:IsA("BasePart") or arg:IsA("Model")) then
+                    args[i] = targetPart
+                end
+            end
+        end
+    end
+    
+    return old_fireserver(self, unpack(args))
+end)
+
+-- 3. Hook other common shooting methods
+-- Hook FindPartOnRay
+local old_findpartonray
+old_findpartonray = hookfunction(Workspace.FindPartOnRay, function(self, ray, ...)
+    if SilentAimEnabled and CurrentTarget and CurrentTarget.Character then
+        local targetPart = GetTargetPart(CurrentTarget.Character)
+        if targetPart then
+            local origin = ray.Origin
+            local direction = (targetPart.Position - origin).Unit * MaxDistance
+            ray = Ray.new(origin, direction)
+        end
+    end
+    
+    return old_findpartonray(self, ray, ...)
+end)
+
+-- Create mobile toggle button
+local function SetupMobileSupport()
+    if IsMobile then
+        -- Create ScreenGui for mobile controls
+        local ScreenGui = Instance.new("ScreenGui")
+        ScreenGui.Name = "SilentAimMobile"
+        ScreenGui.ResetOnSpawn = false
+        ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+        
+        -- Create toggle button
+        local ToggleButton = Instance.new("TextButton")
+        ToggleButton.Name = "ToggleButton"
+        ToggleButton.Size = UDim2.new(0, 60, 0, 60)
+        ToggleButton.Position = UDim2.new(0.9, -30, 0.5, -30)
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        ToggleButton.BorderSizePixel = 0
+        ToggleButton.Text = "SA"
+        ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+        ToggleButton.TextSize = 18
+        ToggleButton.Font = Enum.Font.GothamBold
+        ToggleButton.BackgroundTransparency = 0.3
+        ToggleButton.Parent = ScreenGui
+        
+        -- Add corner
+        local Corner = Instance.new("UICorner")
+        Corner.CornerRadius = UDim.new(1, 0)
+        Corner.Parent = ToggleButton
+        
+        -- Add toggle functionality
+        ToggleButton.TouchTap:Connect(function()
+            SilentAimEnabled = not SilentAimEnabled
+            
+            -- Visual feedback
+            if SilentAimEnabled then
+                ToggleButton.BackgroundColor3 = Color3.fromRGB(0, 120, 0)
+            else
+                ToggleButton.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
+                
+                -- Remove highlight if disabled
+                if CurrentHighlight then
+                    CurrentHighlight:Destroy()
+                    CurrentHighlight = nil
+                end
+            end
+            
+            -- Tween for visual feedback
+            local tween = TweenService:Create(
+                ToggleButton,
+                TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                {BackgroundTransparency = 0.3}
+            )
+            
+            ToggleButton.BackgroundTransparency = 0.1
+            tween:Play()
+        end)
+        
+        -- FOV slider for mobile
+        local FOVSlider = Instance.new("Frame")
+        FOVSlider.Name = "FOVSlider"
+        FOVSlider.Size = UDim2.new(0, 200, 0, 40)
+        FOVSlider.Position = UDim2.new(0.5, -100, 0.9, -20)
+        FOVSlider.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        FOVSlider.BackgroundTransparency = 0.3
+        FOVSlider.BorderSizePixel = 0
+        FOVSlider.Parent = ScreenGui
+        
+        local SliderCorner = Instance.new("UICorner")
+        SliderCorner.CornerRadius = UDim.new(0, 8)
+        SliderCorner.Parent = FOVSlider
+        
+        local SliderButton = Instance.new("TextButton")
+        SliderButton.Name = "SliderButton"
+        SliderButton.Size = UDim2.new(0, 30, 0, 30)
+        SliderButton.Position = UDim2.new((FOV / 1000), -15, 0.5, -15)
+        SliderButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        SliderButton.BorderSizePixel = 0
+        SliderButton.Text = ""
+        SliderButton.Parent = FOVSlider
+        
+        local ButtonCorner = Instance.new("UICorner")
+        ButtonCorner.CornerRadius = UDim.new(1, 0)
+        ButtonCorner.Parent = SliderButton
+        
+        local FOVText = Instance.new("TextLabel")
+        FOVText.Name = "FOVText"
+        FOVText.Size = UDim2.new(1, 0, 0, 20)
+        FOVText.Position = UDim2.new(0, 0, -0.7, 0)
+        FOVText.BackgroundTransparency = 1
+        FOVText.Text = "FOV: " .. FOV
+        FOVText.TextColor3 = Color3.fromRGB(255, 255, 255)
+        FOVText.TextSize = 14
+        FOVText.Font = Enum.Font.GothamBold
+        FOVText.Parent = FOVSlider
+        
+        -- Slider functionality
+        local isDragging = false
+        
+        SliderButton.TouchLongPress:Connect(function()
+            isDragging = true
+        end)
+        
+        UserInputService.TouchEnded:Connect(function()
+            isDragging = false
+        end)
+        
+        RunService.RenderStepped:Connect(function()
+            if isDragging then
+                local mousePos = UserInputService:GetMouseLocation()
+                local sliderPos = FOVSlider.AbsolutePosition
+                local sliderSize = FOVSlider.AbsoluteSize
+                
+                local relativeX = math.clamp((mousePos.X - sliderPos.X) / sliderSize.X, 0, 1)
+                SliderButton.Position = UDim2.new(relativeX, -15, 0.5, -15)
+                
+                -- Update FOV value (10 to 1000 range)
+                FOV = math.floor(relativeX * 1000)
+                if FOV < 10 then FOV = 10 end
+                
+                FOVText.Text = "FOV: " .. FOV
+                if FOVCircle then
+                    FOVCircle.Radius = FOV
+                end
+            end
+        end)
+    end
+end
+
+-- Update target and highlight
+RunService.RenderStepped:Connect(function()
+    -- Update FOV circle position
+    if ShowFOV and FOVCircle then
+        FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+        FOVCircle.Radius = FOV
+        FOVCircle.Visible = ShowFOV and SilentAimEnabled
+    end
+    
+    local Target = GetClosestPlayerToCursor()
+    
+    -- Update current target
+    if Target then
+        CurrentTarget = Target
+    else
+        CurrentTarget = nil
+    end
+    
+    -- Remove previous highlight if target changed
+    if CurrentHighlight and (not CurrentTarget or CurrentHighlight.Parent ~= CurrentTarget.Character) then
+        CurrentHighlight:Destroy()
+        CurrentHighlight = nil
+    end
+    
+     -- Create new highlight for current target
+    if SilentAimEnabled and CurrentTarget and not CurrentHighlight then
+        CurrentHighlight = Instance.new("Highlight")
+        CurrentHighlight.FillColor = TargetColor
+        CurrentHighlight.OutlineColor = TargetColor
+        CurrentHighlight.FillTransparency = 0.5
+        CurrentHighlight.OutlineTransparency = 0
+        CurrentHighlight.Parent = CurrentTarget.Character
+    end
+end)
+
+-- Toggle silent aim with right click (for PC)
+UserInputService.InputBegan:Connect(function(input)
+    if not IsMobile and input.UserInputType == Enum.UserInputType.MouseButton2 then
+        SilentAimEnabled = not SilentAimEnabled
+        
+        -- Feedback for toggling
+        if not SilentAimEnabled and CurrentHighlight then
+            CurrentHighlight:Destroy()
+            CurrentHighlight = nil
+        end
+    end
+end)
+
+-- Settings GUI
+local function CreateSettingsGui()
+    -- Create main GUI
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "SilentAimSettings"
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    ScreenGui.DisplayOrder = 999
+    
+    -- Check if we need to use CoreGui (for newer Roblox versions)
+    pcall(function()
+        if syn and syn.protect_gui then
+            syn.protect_gui(ScreenGui)
+            ScreenGui.Parent = game:GetService("CoreGui")
+        else
+            ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+        end
+    end)
+    
+    -- Create toggle button for settings
+    local SettingsButton = Instance.new("TextButton")
+    SettingsButton.Name = "SettingsButton"
+    SettingsButton.Size = UDim2.new(0, 40, 0, 40)
+    SettingsButton.Position = UDim2.new(0, 10, 0, 10)
+    SettingsButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    SettingsButton.BorderSizePixel = 0
+    SettingsButton.Text = "⚙️"
+    SettingsButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    SettingsButton.TextSize = 18
+    SettingsButton.Font = Enum.Font.GothamBold
+    SettingsButton.BackgroundTransparency = 0.3
+    SettingsButton.Parent = ScreenGui
+    
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 8)
+    Corner.Parent = SettingsButton
+    
+    -- Create settings panel (hidden by default)
+    local SettingsPanel = Instance.new("Frame")
+    SettingsPanel.Name = "SettingsPanel"
+    SettingsPanel.Size = UDim2.new(0, 250, 0, 300)
+    SettingsPanel.Position = UDim2.new(0, 10, 0, 60)
+    SettingsPanel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    SettingsPanel.BorderSizePixel = 0
+    SettingsPanel.Visible = false
+    SettingsPanel.Parent = ScreenGui
+    
+    local PanelCorner = Instance.new("UICorner")
+    PanelCorner.CornerRadius = UDim.new(0, 8)
+    PanelCorner.Parent = SettingsPanel
+    
+    -- Title
+    local Title = Instance.new("TextLabel")
+    Title.Name = "Title"
+    Title.Size = UDim2.new(1, 0, 0, 40)
+    Title.BackgroundTransparency = 1
+    Title.Text = "Silent Aim Settings"
+    Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Title.TextSize = 18
+    Title.Font = Enum.Font.GothamBold
+    Title.Parent = SettingsPanel
+    
+    -- Create settings options
+    local function CreateToggle(name, yPos, defaultValue, callback)
+        local Toggle = Instance.new("Frame")
+        Toggle.Name = name .. "Toggle"
+        Toggle.Size = UDim2.new(0.9, 0, 0, 30)
+        Toggle.Position = UDim2.new(0.05, 0, 0, yPos)
+        Toggle.BackgroundTransparency = 1
+        Toggle.Parent = SettingsPanel
+        
+        local Label = Instance.new("TextLabel")
+        Label.Name = "Label"
+        Label.Size = UDim2.new(0.7, 0, 1, 0)
+        Label.Position = UDim2.new(0, 0, 0, 0)
+        Label.BackgroundTransparency = 1
+        Label.Text = name
+        Label.TextColor3 = Color3.fromRGB(255, 255, 255)
+        Label.TextSize = 14
+        Label.Font = Enum.Font.Gotham
+        Label.TextXAlignment = Enum.TextXAlignment.Left
+        Label.Parent = Toggle
+        
+        local Button = Instance.new("TextButton")
+        Button.Name = "Button"
+        Button.Size = UDim2.new(0, 40, 0, 20)
+        Button.Position = UDim2.new(1, -40, 0.5, -10)
+        Button.BackgroundColor3 = defaultValue and Color3.fromRGB(0, 120, 0) or Color3.fromRGB(120, 0, 0)
+        Button.BorderSizePixel = 0
+        Button.Text = ""
+        Button.Parent = Toggle
+        
+        local ButtonCorner = Instance.new("UICorner")
+        ButtonCorner.CornerRadius = UDim.new(0, 10)
+        ButtonCorner.Parent = Button
+        
+        local Circle = Instance.new("Frame")
+        Circle.Name = "Circle"
+        Circle.Size = UDim2.new(0, 16, 0, 16)
+        Circle.Position = defaultValue and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
+        Circle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        Circle.BorderSizePixel = 0
+        Circle.Parent = Button
+        
+        local CircleCorner = Instance.new("UICorner")
+        CircleCorner.CornerRadius = UDim.new(1, 0)
+        CircleCorner.Parent = Circle
+        
+        -- Toggle functionality
+        local value = defaultValue
+        Button.MouseButton1Click:Connect(function()
+            value = not value
+            
+            -- Visual update
+            if value then
+                Button.BackgroundColor3 = Color3.fromRGB(0, 120, 0)
+                TweenService:Create(Circle, TweenInfo.new(0.2), {Position = UDim2.new(1, -18, 0.5, -8)}):Play()
+            else
+                Button.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
+                TweenService:Create(Circle, TweenInfo.new(0.2), {Position = UDim2.new(0, 2, 0.5, -8)}):Play()
+            end
+            
+            -- Callback
+            callback(value)
+        end)
+        
+        -- For mobile
+        if IsMobile then
+            Button.TouchTap:Connect(function()
+                value = not value
+                
+                -- Visual update
+                if value then
+                    Button.BackgroundColor3 = Color3.fromRGB(0, 120, 0)
+                    TweenService:Create(Circle, TweenInfo.new(0.2), {Position = UDim2.new(1, -18, 0.5, -8)}):Play()
+                else
+                    Button.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
+                    TweenService:Create(Circle, TweenInfo.new(0.2), {Position = UDim2.new(0, 2, 0.5, -8)}):Play()
+                end
+                
+                -- Callback
+                callback(value)
+            end)
+        end
+    end
+
+    -- Create dropdown
+    local function CreateDropdown(name, yPos, options, defaultValue, callback)
+        local Dropdown = Instance.new("Frame")
+        Dropdown.Name = name .. "Dropdown"
+        Dropdown.Size = UDim2.new(0.9, 0, 0, 30)
+        Dropdown.Position = UDim2.new(0.05, 0, 0, yPos)
+        Dropdown.BackgroundTransparency = 1
+        Dropdown.Parent = SettingsPanel
+        
+        local Label = Instance.new("TextLabel")
+        Label.Name = "Label"
+        Label.Size = UDim2.new(0.4, 0, 1, 0)
+        Label.Position = UDim2.new(0, 0, 0, 0)
+        Label.BackgroundTransparency = 1
+        Label.Text = name
+        Label.TextColor3 = Color3.fromRGB(255, 255, 255)
+        Label.TextSize = 14
+        Label.Font = Enum.Font.Gotham
+        Label.TextXAlignment = Enum.TextXAlignment.Left
+        Label.Parent = Dropdown
+        
+        local Button = Instance.new("TextButton")
+        Button.Name = "Button"
+        Button.Size = UDim2.new(0.6, 0, 1, 0)
+        Button.Position = UDim2.new(0.4, 0, 0, 0)
+        Button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        Button.BorderSizePixel = 0
+        Button.Text = defaultValue
+        Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+        Button.TextSize = 14
+        Button.Font = Enum.Font.Gotham
+        Button.Parent = Dropdown
+        
+        local ButtonCorner = Instance.new("UICorner")
+        ButtonCorner.CornerRadius = UDim.new(0, 6)
+        ButtonCorner.Parent = Button
+        
+        -- Create dropdown menu (hidden by default)
+        local DropdownMenu = Instance.new("Frame")
+        DropdownMenu.Name = "DropdownMenu"
+        DropdownMenu.Size = UDim2.new(0.6, 0, 0, #options * 30)
+        DropdownMenu.Position = UDim2.new(0.4, 0, 1, 5)
+        DropdownMenu.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        DropdownMenu.BorderSizePixel = 0
+        DropdownMenu.Visible = false
+        DropdownMenu.ZIndex = 10
+        DropdownMenu.Parent = Dropdown
+        
+        local MenuCorner = Instance.new("UICorner")
+        MenuCorner.CornerRadius = UDim.new(0, 6)
+        MenuCorner.Parent = DropdownMenu
+        
+        -- Create options
+        for i, option in ipairs(options) do
+            local OptionButton = Instance.new("TextButton")
+            OptionButton.Name = option
+            OptionButton.Size = UDim2.new(1, 0, 0, 30)
+            OptionButton.Position = UDim2.new(0, 0, 0, (i-1) * 30)
+            OptionButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+            OptionButton.BackgroundTransparency = 0.5
+            OptionButton.BorderSizePixel = 0
+            OptionButton.Text = option
+            OptionButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+            OptionButton.TextSize = 14
+            OptionButton.Font = Enum.Font.Gotham
+            OptionButton.ZIndex = 11
+            OptionButton.Parent = DropdownMenu
+            
+            -- Option selection
+            OptionButton.MouseButton1Click:Connect(function()
+                Button.Text = option
+                DropdownMenu.Visible = false
+                callback(option)
+            end)
+            
+            -- For mobile
+            if IsMobile then
+                OptionButton.TouchTap:Connect(function()
+                    Button.Text = option
+                    DropdownMenu.Visible = false
+                    callback(option)
+                end)
+            end
+        end
+        
+        -- Toggle dropdown visibility
+        Button.MouseButton1Click:Connect(function()
+            DropdownMenu.Visible = not DropdownMenu.Visible
+        end)
+        
+        -- For mobile
+        if IsMobile then
+            Button.TouchTap:Connect(function()
+                DropdownMenu.Visible = not DropdownMenu.Visible
+            end)
+        end
+        
+        -- Close dropdown when clicking elsewhere
+        UserInputService.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or 
+               input.UserInputType == Enum.UserInputType.Touch then
+                if DropdownMenu.Visible and not Button:IsDescendantOf(game) then
+                    DropdownMenu.Visible = false
+                end
+            end
+        end)
+    end
+    
+    -- Create slider
+    local function CreateSlider(name, yPos, min, max, defaultValue, callback)
+        local Slider = Instance.new("Frame")
+        Slider.Name = name .. "Slider"
+        Slider.Size = UDim2.new(0.9, 0, 0, 50)
+        Slider.Position = UDim2.new(0.05, 0, 0, yPos)
+        Slider.BackgroundTransparency = 1
+        Slider.Parent = SettingsPanel
+        
+        local Label = Instance.new("TextLabel")
+        Label.Name = "Label"
+        Label.Size = UDim2.new(1, 0, 0, 20)
+        Label.Position = UDim2.new(0, 0, 0, 0)
+        Label.BackgroundTransparency = 1
+        Label.Text = name .. ": " .. defaultValue
+        Label.TextColor3 = Color3.fromRGB(255, 255, 255)
+        Label.TextSize = 14
+        Label.Font = Enum.Font.Gotham
+        Label.TextXAlignment = Enum.TextXAlignment.Left
+        Label.Parent = Slider
+        
+        local SliderBar = Instance.new("Frame")
+        SliderBar.Name = "SliderBar"
+        SliderBar.Size = UDim2.new(1, 0, 0, 10)
+        SliderBar.Position = UDim2.new(0, 0, 0.5, 0)
+        SliderBar.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        SliderBar.BorderSizePixel = 0
+        SliderBar.Parent = Slider
+        
+        local BarCorner = Instance.new("UICorner")
+        BarCorner.CornerRadius = UDim.new(0, 5)
+        BarCorner.Parent = SliderBar
+        
+        local SliderButton = Instance.new("TextButton")
+        SliderButton.Name = "SliderButton"
+        SliderButton.Size = UDim2.new(0, 20, 0, 20)
+        local percentage = (defaultValue - min) / (max - min)
+        SliderButton.Position = UDim2.new(percentage, -10, 0.5, -10)
+        SliderButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        SliderButton.BorderSizePixel = 0
+        SliderButton.Text = ""
+        SliderButton.Parent = SliderBar
+        
+        local ButtonCorner = Instance.new("UICorner")
+        ButtonCorner.CornerRadius = UDim.new(1, 0)
+        ButtonCorner.Parent = SliderButton
+        
+        -- Slider functionality
+        local isDragging = false
+        local value = defaultValue
+        
+        SliderButton.MouseButton1Down:Connect(function()
+            isDragging = true
+        end)
+        
+        UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                isDragging = false
+            end
+        end)
+        
+        -- For mobile
+        if IsMobile then
+            SliderButton.TouchLongPress:Connect(function()
+                isDragging = true
+            end)
+            
+            UserInputService.TouchEnded:Connect(function()
+                isDragging = false
+            end)
+        end
+        
+        RunService.RenderStepped:Connect(function()
+            if isDragging then
+                local mousePos = UserInputService:GetMouseLocation()
+                local sliderPos = SliderBar.AbsolutePosition
+                local sliderSize = SliderBar.AbsoluteSize
+                
+                local relativeX = math.clamp((mousePos.X - sliderPos.X) / sliderSize.X, 0, 1)
+                SliderButton.Position = UDim2.new(relativeX, -10, 0.5, -10)
+                
+                -- Update value
+                value = math.floor(min + (relativeX * (max - min)))
+                Label.Text = name .. ": " .. value
+                
+                -- Callback
+                callback(value)
+            end
+        end)
+    end
+    
+    -- Add settings
+    CreateToggle("Silent Aim", 50, SilentAimEnabled, function(value)
+        SilentAimEnabled = value
+        if not SilentAimEnabled and CurrentHighlight then
+            CurrentHighlight:Destroy()
+            CurrentHighlight = nil
+        end
+    end)
+    
+    CreateToggle("Show FOV", 90, ShowFOV, function(value)
+        ShowFOV = value
+        if FOVCircle then
+            FOVCircle.Visible = ShowFOV and SilentAimEnabled
+        end
+    end)
+    
+    CreateToggle("Team Check", 130, TeamCheck, function(value)
+        TeamCheck = value
+    end)
+    
+    CreateToggle("Visibility Check", 170, VisibilityCheck, function(value)
+        VisibilityCheck = value
+    end)
+    
+    CreateDropdown("Target Part", 210, {"Head", "HumanoidRootPart", "Torso"}, TargetPart, function(value)
+        TargetPart = value
+    end)
+    
+    CreateSlider("FOV", 250, 10, 1000, FOV, function(value)
+        FOV = value
+        if FOVCircle then
+            FOVCircle.Radius = FOV
+        end
+    end)
+    
+    -- Toggle settings panel
+    SettingsButton.MouseButton1Click:Connect(function()
+        SettingsPanel.Visible = not SettingsPanel.Visible
+    end)
+    
+    -- For mobile
+    if IsMobile then
+        SettingsButton.TouchTap:Connect(function()
+            SettingsPanel.Visible = not SettingsPanel.Visible
+        end)
+    end
+end
+
+-- Initialize
+local function Initialize()
+    -- Create FOV circle
+    if Drawing then
+        CreateFOVCircle()
+    else
+        ShowFOV = false
+        print("Drawing library not available, FOV circle disabled")
+    end
+    
+    -- Setup for mobile devices
+    if IsMobile then
+        SetupMobileSupport()
+    end
+    
+    -- Create settings GUI
+    CreateSettingsGui()
+    
+    -- Notification
+    StarterGui:SetCore("SendNotification", {
+        Title = "Universal Silent Aim",
+        Text = "Loaded successfully. " .. (IsMobile and "Use the button to toggle." or "Toggle with right-click."),
+        Duration = 3
+    })
+end
+
+-- Run initialization
+Initialize()

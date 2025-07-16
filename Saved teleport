@@ -1,1 +1,934 @@
+-- SaveLocation System
+local Players = game:GetService("Players")
+local Player = Players.LocalPlayer
+local Mouse = Player:GetMouse()
+local UserInputService = game:GetService("UserInputService")
+local HttpService = game:GetService("HttpService")
 
+-- Create ScreenGui
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "SaveLocationSystem"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = Player.PlayerGui
+
+-- Create Main Frame
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 300, 0, 400)
+MainFrame.Position = UDim2.new(0.8, 0, 0.5, 0)
+MainFrame.AnchorPoint = Vector2.new(0, 0.5)
+MainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+-- Create Title Bar
+local TitleBar = Instance.new("Frame")
+TitleBar.Name = "TitleBar"
+TitleBar.Size = UDim2.new(1, 0, 0, 40)
+TitleBar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Name = "Title"
+Title.Size = UDim2.new(0.8, 0, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "Save Location System"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 18
+Title.Font = Enum.Font.GothamBold
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = TitleBar
+
+-- Create Minimize Button
+local MinimizeButton = Instance.new("TextButton")
+MinimizeButton.Name = "MinimizeButton"
+MinimizeButton.Size = UDim2.new(0, 30, 0, 30)
+MinimizeButton.Position = UDim2.new(1, -35, 0, 5)
+MinimizeButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+MinimizeButton.BorderSizePixel = 0
+MinimizeButton.Text = "-"
+MinimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinimizeButton.TextSize = 24
+MinimizeButton.Font = Enum.Font.GothamBold
+MinimizeButton.Parent = TitleBar
+
+-- Create Content Frame (everything below title bar)
+local ContentFrame = Instance.new("Frame")
+ContentFrame.Name = "ContentFrame"
+ContentFrame.Size = UDim2.new(1, 0, 1, -40)
+ContentFrame.Position = UDim2.new(0, 0, 0, 40)
+ContentFrame.BackgroundTransparency = 1
+ContentFrame.Parent = MainFrame
+
+-- Create Saved Locations List
+local SavedLocationsFrame = Instance.new("ScrollingFrame")
+SavedLocationsFrame.Name = "SavedLocationsFrame"
+SavedLocationsFrame.Size = UDim2.new(1, -20, 1, -150)
+SavedLocationsFrame.Position = UDim2.new(0, 10, 0, 10)
+SavedLocationsFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+SavedLocationsFrame.BorderSizePixel = 0
+SavedLocationsFrame.ScrollBarThickness = 6
+SavedLocationsFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+SavedLocationsFrame.Parent = ContentFrame
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.Padding = UDim.new(0, 5)
+UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+UIListLayout.Parent = SavedLocationsFrame
+
+-- Create Bottom Buttons
+local SaveButton = Instance.new("TextButton")
+SaveButton.Name = "SaveButton"
+SaveButton.Size = UDim2.new(0.48, 0, 0, 40)
+SaveButton.Position = UDim2.new(0, 10, 1, -95)
+SaveButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+SaveButton.BorderSizePixel = 0
+SaveButton.Text = "Save Location"
+SaveButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+SaveButton.TextSize = 16
+SaveButton.Font = Enum.Font.GothamSemibold
+SaveButton.Parent = ContentFrame
+
+local ConfigButton = Instance.new("TextButton")
+ConfigButton.Name = "ConfigButton"
+ConfigButton.Size = UDim2.new(0.48, 0, 0, 40)
+ConfigButton.Position = UDim2.new(0.52, 0, 1, -95)
+ConfigButton.BackgroundColor3 = Color3.fromRGB(142, 68, 173)
+ConfigButton.BorderSizePixel = 0
+ConfigButton.Text = "Config Options"
+ConfigButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ConfigButton.TextSize = 16
+ConfigButton.Font = Enum.Font.GothamSemibold
+ConfigButton.Parent = ContentFrame
+
+-- Create Config Panel (hidden by default)
+local ConfigPanel = Instance.new("Frame")
+ConfigPanel.Name = "ConfigPanel"
+ConfigPanel.Size = UDim2.new(1, -20, 0, 90)
+ConfigPanel.Position = UDim2.new(0, 10, 1, -45)
+ConfigPanel.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+ConfigPanel.BorderSizePixel = 0
+ConfigPanel.Visible = false
+ConfigPanel.Parent = ContentFrame
+
+local SaveConfigButton = Instance.new("TextButton")
+SaveConfigButton.Name = "SaveConfigButton"
+SaveConfigButton.Size = UDim2.new(0.48, 0, 0, 30)
+SaveConfigButton.Position = UDim2.new(0, 5, 0, 5)
+SaveConfigButton.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+SaveConfigButton.BorderSizePixel = 0
+SaveConfigButton.Text = "Save Config"
+SaveConfigButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+SaveConfigButton.TextSize = 14
+SaveConfigButton.Font = Enum.Font.GothamSemibold
+SaveConfigButton.Parent = ConfigPanel
+
+local LoadConfigButton = Instance.new("TextButton")
+LoadConfigButton.Name = "LoadConfigButton"
+LoadConfigButton.Size = UDim2.new(0.48, 0, 0, 30)
+LoadConfigButton.Position = UDim2.new(0.52, 0, 0, 5)
+LoadConfigButton.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
+LoadConfigButton.BorderSizePixel = 0
+LoadConfigButton.Text = "Load Config"
+LoadConfigButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+LoadConfigButton.TextSize = 14
+LoadConfigButton.Font = Enum.Font.GothamSemibold
+LoadConfigButton.Parent = ConfigPanel
+
+local ManageConfigsButton = Instance.new("TextButton")
+ManageConfigsButton.Name = "ManageConfigsButton"
+ManageConfigsButton.Size = UDim2.new(1, -10, 0, 30)
+ManageConfigsButton.Position = UDim2.new(0, 5, 0, 40)
+ManageConfigsButton.BackgroundColor3 = Color3.fromRGB(230, 126, 34)
+ManageConfigsButton.BorderSizePixel = 0
+ManageConfigsButton.Text = "Manage Configurations"
+ManageConfigsButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ManageConfigsButton.TextSize = 14
+ManageConfigsButton.Font = Enum.Font.GothamSemibold
+ManageConfigsButton.Parent = ConfigPanel
+
+-- Create Minimized Button (hidden by default)
+local MinimizedButton = Instance.new("TextButton")
+MinimizedButton.Name = "MinimizedButton"
+MinimizedButton.Size = UDim2.new(0, 40, 0, 40)
+MinimizedButton.Position = UDim2.new(0.95, 0, 0.5, 0)
+MinimizedButton.AnchorPoint = Vector2.new(0, 0.5)
+MinimizedButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+MinimizedButton.BorderSizePixel = 0
+MinimizedButton.Text = "+"
+MinimizedButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinimizedButton.TextSize = 24
+MinimizedButton.Font = Enum.Font.GothamBold
+MinimizedButton.Visible = false
+MinimizedButton.Parent = ScreenGui
+
+-- Round corners for UI elements
+local function ApplyCorners(instance, radius)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, radius or 5)
+    corner.Parent = instance
+end
+
+ApplyCorners(MainFrame)
+ApplyCorners(TitleBar)
+ApplyCorners(SavedLocationsFrame)
+ApplyCorners(SaveButton)
+ApplyCorners(ConfigButton)
+ApplyCorners(MinimizeButton, 4)
+ApplyCorners(MinimizedButton)
+ApplyCorners(ConfigPanel)
+ApplyCorners(SaveConfigButton)
+ApplyCorners(LoadConfigButton)
+ApplyCorners(ManageConfigsButton)
+
+-- Saved locations table
+local savedLocations = {}
+local savedConfigs = {}
+local currentConfigName = "Default"
+
+-- Function to update the UI list
+local function UpdateLocationsList()
+    -- Clear existing items
+    for _, child in pairs(SavedLocationsFrame:GetChildren()) do
+        if child:IsA("Frame") then
+            child:Destroy()
+        end
+    end
+    
+    -- Add saved locations to the list
+    local yOffset = 0
+    for i, location in ipairs(savedLocations) do
+        local locationFrame = Instance.new("Frame")
+        locationFrame.Name = "Location_" .. i
+        locationFrame.Size = UDim2.new(1, -10, 0, 70)
+        locationFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        locationFrame.BorderSizePixel = 0
+        ApplyCorners(locationFrame)
+        
+        local locationName = Instance.new("TextLabel")
+        locationName.Name = "LocationName"
+        locationName.Size = UDim2.new(1, -20, 0, 30)
+        locationName.Position = UDim2.new(0, 10, 0, 5)
+        locationName.BackgroundTransparency = 1
+        locationName.Text = location.name
+        locationName.TextColor3 = Color3.fromRGB(255, 255, 255)
+        locationName.TextSize = 16
+        locationName.Font = Enum.Font.GothamSemibold
+        locationName.TextXAlignment = Enum.TextXAlignment.Left
+        locationName.Parent = locationFrame
+        
+        local teleportButton = Instance.new("TextButton")
+        teleportButton.Name = "TeleportButton"
+        teleportButton.Size = UDim2.new(0.3, 0, 0, 25)
+        teleportButton.Position = UDim2.new(0, 10, 0, 40)
+        teleportButton.BackgroundColor3 = Color3.fromRGB(0, 170, 127)
+        teleportButton.BorderSizePixel = 0
+        teleportButton.Text = "Teleport"
+        teleportButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+        teleportButton.TextSize = 14
+        teleportButton.Font = Enum.Font.GothamSemibold
+        ApplyCorners(teleportButton)
+        teleportButton.Parent = locationFrame
+        
+        local renameButton = Instance.new("TextButton")
+        renameButton.Name = "RenameButton"
+        renameButton.Size = UDim2.new(0.3, 0, 0, 25)
+        renameButton.Position = UDim2.new(0.35, 0, 0, 40)
+        renameButton.BackgroundColor3 = Color3.fromRGB(230, 126, 34)
+        renameButton.BorderSizePixel = 0
+        renameButton.Text = "Rename"
+        renameButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+        renameButton.TextSize = 14
+        renameButton.Font = Enum.Font.GothamSemibold
+        ApplyCorners(renameButton)
+        renameButton.Parent = locationFrame
+        
+        local deleteButton = Instance.new("TextButton")
+        deleteButton.Name = "DeleteButton"
+        deleteButton.Size = UDim2.new(0.3, 0, 0, 25)
+        deleteButton.Position = UDim2.new(0.7, 0, 0, 40)
+        deleteButton.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+        deleteButton.BorderSizePixel = 0
+        deleteButton.Text = "Delete"
+        deleteButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+        deleteButton.TextSize = 14
+        deleteButton.Font = Enum.Font.GothamSemibold
+        ApplyCorners(deleteButton)
+        deleteButton.Parent = locationFrame
+        
+        -- Button functions
+        teleportButton.MouseButton1Click:Connect(function()
+            local character = Player.Character or Player.CharacterAdded:Wait()
+            local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+            if humanoidRootPart then
+                humanoidRootPart.CFrame = location.cframe
+            end
+        end)
+        
+        renameButton.MouseButton1Click:Connect(function()
+            -- Create rename prompt
+            local renameFrame = Instance.new("Frame")
+            renameFrame.Name = "RenameFrame"
+            renameFrame.Size = UDim2.new(0, 250, 0, 120)
+            renameFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+            renameFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+            renameFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+            renameFrame.BorderSizePixel = 0
+            ApplyCorners(renameFrame)
+            renameFrame.Parent = ScreenGui
+            
+            local renameTitle = Instance.new("TextLabel")
+            renameTitle.Name = "RenameTitle"
+            renameTitle.Size = UDim2.new(1, 0, 0, 30)
+            renameTitle.BackgroundTransparency = 1
+            renameTitle.Text = "Rename Location"
+            renameTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+            renameTitle.TextSize = 16
+            renameTitle.Font = Enum.Font.GothamBold
+            renameTitle.Parent = renameFrame
+            
+            local renameInput = Instance.new("TextBox")
+            renameInput.Name = "RenameInput"
+            renameInput.Size = UDim2.new(0.9, 0, 0, 30)
+            renameInput.Position = UDim2.new(0.5, 0, 0, 40)
+            renameInput.AnchorPoint = Vector2.new(0.5, 0)
+            renameInput.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+            renameInput.BorderSizePixel = 0
+            renameInput.Text = location.name
+            renameInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+            renameInput.TextSize = 14
+            renameInput.Font = Enum.Font.Gotham
+            renameInput.PlaceholderText = "Enter new name..."
+            ApplyCorners(renameInput)
+            renameInput.Parent = renameFrame
+            
+            local confirmButton = Instance.new("TextButton")
+            confirmButton.Name = "ConfirmButton"
+            confirmButton.Size = UDim2.new(0.45, 0, 0, 30)
+            confirmButton.Position = UDim2.new(0.25, 0, 0, 80)
+            confirmButton.AnchorPoint = Vector2.new(0.5, 0)
+            confirmButton.BackgroundColor3 = Color3.fromRGB(0, 170, 127)
+            confirmButton.BorderSizePixel = 0
+            confirmButton.Text = "Confirm"
+            confirmButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+            confirmButton.TextSize = 14
+            confirmButton.Font = Enum.Font.GothamSemibold
+            ApplyCorners(confirmButton)
+            confirmButton.Parent = renameFrame
+            
+            local cancelButton = Instance.new("TextButton")
+            cancelButton.Name = "CancelButton"
+            cancelButton.Size = UDim2.new(0.45, 0, 0, 30)
+            cancelButton.Position = UDim2.new(0.75, 0, 0, 80)
+            cancelButton.AnchorPoint = Vector2.new(0.5, 0)
+            cancelButton.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+            cancelButton.BorderSizePixel = 0
+            cancelButton.Text = "Cancel"
+            cancelButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+            cancelButton.TextSize = 14
+            cancelButton.Font = Enum.Font.GothamSemibold
+            ApplyCorners(cancelButton)
+            cancelButton.Parent = renameFrame
+            
+            confirmButton.MouseButton1Click:Connect(function()
+                local newName = renameInput.Text
+                if newName and newName ~= "" then
+                    savedLocations[i].name = newName
+                    UpdateLocationsList()
+                end
+                renameFrame:Destroy()
+            end)
+            
+            cancelButton.MouseButton1Click:Connect(function()
+                renameFrame:Destroy()
+            end)
+        end)
+        
+        deleteButton.MouseButton1Click:Connect(function()
+            table.remove(savedLocations, i)
+            UpdateLocationsList()
+        end)
+        
+        locationFrame.Parent = SavedLocationsFrame
+        yOffset = yOffset + 75
+    end
+    
+    SavedLocationsFrame.CanvasSize = UDim2.new(0, 0, 0, math.max(yOffset, SavedLocationsFrame.AbsoluteSize.Y))
+    
+    -- Update title to show current config
+    Title.Text = "Locations: " .. currentConfigName
+end
+
+-- Function to create a popup window
+local function CreatePopup(title, size)
+    local popupFrame = Instance.new("Frame")
+    popupFrame.Name = "PopupFrame"
+    popupFrame.Size = size or UDim2.new(0, 300, 0, 200)
+    popupFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+    popupFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+    popupFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    popupFrame.BorderSizePixel = 0
+    ApplyCorners(popupFrame)
+    popupFrame.Parent = ScreenGui
+    
+    local popupTitle = Instance.new("TextLabel")
+    popupTitle.Name = "PopupTitle"
+    popupTitle.Size = UDim2.new(1, 0, 0, 30)
+    popupTitle.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    popupTitle.BorderSizePixel = 0
+    popupTitle.Text = title
+    popupTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    popupTitle.TextSize = 16
+    popupTitle.Font = Enum.Font.GothamBold
+    ApplyCorners(popupTitle, 5)
+    popupTitle.Parent = popupFrame
+    
+    local closeButton = Instance.new("TextButton")
+    closeButton.Name = "CloseButton"
+    closeButton.Size = UDim2.new(0, 25, 0, 25)
+    closeButton.Position = UDim2.new(1, -28, 0, 3)
+    closeButton.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+    closeButton.BorderSizePixel = 0
+    closeButton.Text = "X"
+    closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    closeButton.TextSize = 14
+    closeButton.Font = Enum.Font.GothamBold
+    ApplyCorners(closeButton, 4)
+    closeButton.Parent = popupTitle
+    
+    closeButton.MouseButton1Click:Connect(function()
+        popupFrame:Destroy()
+    end)
+    
+    local contentFrame = Instance.new("Frame")
+    contentFrame.Name = "ContentFrame"
+    contentFrame.Size = UDim2.new(1, 0, 1, -30)
+    contentFrame.Position = UDim2.new(0, 0, 0, 30)
+    contentFrame.BackgroundTransparency = 1
+    contentFrame.Parent = popupFrame
+    
+    return popupFrame, contentFrame
+end
+
+-- Function to serialize CFrame
+local function SerializeCFrame(cf)
+    local x, y, z, r00, r01, r02, r10, r11, r12, r20, r21, r22 = cf:GetComponents()
+    return {x, y, z, r00, r01, r02, r10, r11, r12, r20, r21, r22}
+end
+
+-- Function to deserialize CFrame
+local function DeserializeCFrame(t)
+    return CFrame.new(
+        t[1], t[2], t[3],
+        t[4], t[5], t[6],
+        t[7], t[8], t[9],
+        t[10], t[11], t[12]
+    )
+end
+
+-- Function to save configuration
+local function SaveConfiguration(name)
+    local serializedLocations = {}
+    
+    for i, location in ipairs(savedLocations) do
+        table.insert(serializedLocations, {
+            name = location.name,
+            cframe = SerializeCFrame(location.cframe)
+        })
+    end
+    
+    savedConfigs[name] = serializedLocations
+    currentConfigName = name
+    
+    -- Save to player data store or local storage
+    -- For this example, we'll just keep it in memory
+    
+    -- Update title
+    Title.Text = "Locations: " .. currentConfigName
+end
+
+-- Function to load configuration
+local function LoadConfiguration(name)
+    if savedConfigs[name] then
+        savedLocations = {}
+        
+        for i, serializedLocation in ipairs(savedConfigs[name]) do
+            table.insert(savedLocations, {
+                name = serializedLocation.name,
+                cframe = DeserializeCFrame(serializedLocation.cframe)
+            })
+        end
+        
+        currentConfigName = name
+        UpdateLocationsList()
+    end
+end
+
+-- Function to show save config dialog
+local function ShowSaveConfigDialog()
+    local popup, content = CreatePopup("Save Configuration", UDim2.new(0, 300, 0, 130))
+    
+    local nameInput = Instance.new("TextBox")
+    nameInput.Name = "NameInput"
+    nameInput.Size = UDim2.new(0.9, 0, 0, 30)
+    nameInput.Position = UDim2.new(0.5, 0, 0, 20)
+    nameInput.AnchorPoint = Vector2.new(0.5, 0)
+    nameInput.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    nameInput.BorderSizePixel = 0
+    nameInput.Text = currentConfigName
+    nameInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+    nameInput.TextSize = 14
+    nameInput.Font = Enum.Font.Gotham
+    nameInput.PlaceholderText = "Enter configuration name..."
+    ApplyCorners(nameInput)
+    nameInput.Parent = content
+    
+    local saveButton = Instance.new("TextButton")
+    saveButton.Name = "SaveButton"
+    saveButton.Size = UDim2.new(0.9, 0, 0, 30)
+    saveButton.Position = UDim2.new(0.5, 0, 0, 60)
+    saveButton.AnchorPoint = Vector2.new(0.5, 0)
+    saveButton.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+    saveButton.BorderSizePixel = 0
+    saveButton.Text = "Save Configuration"
+    saveButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    saveButton.TextSize = 14
+    saveButton.Font = Enum.Font.GothamSemibold
+    ApplyCorners(saveButton)
+    saveButton.Parent = content
+    
+    saveButton.MouseButton1Click:Connect(function()
+        local configName = nameInput.Text
+        if configName and configName ~= "" then
+            SaveConfiguration(configName)
+            popup:Destroy()
+        end
+    end)
+end
+
+-- Function to show load config dialog
+local function ShowLoadConfigDialog()
+    local popup, content = CreatePopup("Load Configuration", UDim2.new(0, 300, 0, 250))
+    
+    local configsScrollFrame = Instance.new("ScrollingFrame")
+    configsScrollFrame.Name = "ConfigsScrollFrame"
+    configsScrollFrame.Size = UDim2.new(0.9, 0, 1, -20)
+    configsScrollFrame.Position = UDim2.new(0.5, 0, 0, 10)
+    configsScrollFrame.AnchorPoint = Vector2.new(0.5, 0)
+    configsScrollFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    configsScrollFrame.BorderSizePixel = 0
+    configsScrollFrame.ScrollBarThickness = 6
+    configsScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    ApplyCorners(configsScrollFrame)
+    configsScrollFrame.Parent = content
+    
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.Padding = UDim.new(0, 5)
+    listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    listLayout.Parent = configsScrollFrame
+    
+    -- Populate configs list
+    local yOffset = 0
+    for name, _ in pairs(savedConfigs) do
+        local configButton = Instance.new("TextButton")
+        configButton.Name = "Config_" .. name
+        configButton.Size = UDim2.new(0.95, 0, 0, 40)
+        configButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        configButton.BorderSizePixel = 0
+        configButton.Text = name
+        configButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+        configButton.TextSize = 16
+        configButton.Font = Enum.Font.GothamSemibold
+        ApplyCorners(configButton)
+        configButton.Parent = configsScrollFrame
+        
+        configButton.MouseButton1Click:Connect(function()
+            LoadConfiguration(name)
+            popup:Destroy()
+        end)
+        
+        yOffset = yOffset + 45
+    end
+    
+    configsScrollFrame.CanvasSize = UDim2.new(0, 0, 0, math.max(yOffset, configsScrollFrame.AbsoluteSize.Y))
+    
+    -- If no configs
+    if yOffset == 0 then
+        local noConfigsLabel = Instance.new("TextLabel")
+        noConfigsLabel.Size = UDim2.new(0.9, 0, 0, 40)
+        noConfigsLabel.Position = UDim2.new(0.5, 0, 0, 50)
+        noConfigsLabel.AnchorPoint = Vector2.new(0.5, 0)
+        noConfigsLabel.BackgroundTransparency = 1
+        noConfigsLabel.Text = "No saved configurations"
+        noConfigsLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        noConfigsLabel.TextSize = 16
+        noConfigsLabel.Font = Enum.Font.GothamSemibold
+        noConfigsLabel.Parent = content
+    end
+end
+
+-- Function to show manage configs dialog
+local function ShowManageConfigsDialog()
+    local popup, content = CreatePopup("Manage Configurations", UDim2.new(0, 350, 0, 300))
+    
+    local configsScrollFrame = Instance.new("ScrollingFrame")
+    configsScrollFrame.Name = "ConfigsScrollFrame"
+    configsScrollFrame.Size = UDim2.new(0.9, 0, 1, -20)
+    configsScrollFrame.Position = UDim2.new(0.5, 0, 0, 10)
+    configsScrollFrame.AnchorPoint = Vector2.new(0.5, 0)
+    configsScrollFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    configsScrollFrame.BorderSizePixel = 0
+    configsScrollFrame.ScrollBarThickness = 6
+    configsScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    ApplyCorners(configsScrollFrame)
+    configsScrollFrame.Parent = content
+    
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.Padding = UDim.new(0, 5)
+    listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    listLayout.Parent = configsScrollFrame
+    
+    -- Populate configs list with management options
+    local yOffset = 0
+    for name, _ in pairs(savedConfigs) do
+        local configFrame = Instance.new("Frame")
+        configFrame.Name = "ConfigFrame_" .. name
+        configFrame.Size = UDim2.new(0.95, 0, 0, 70)
+        configFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        configFrame.BorderSizePixel = 0
+        ApplyCorners(configFrame)
+        configFrame.Parent = configsScrollFrame
+        
+        local configName = Instance.new("TextLabel")
+        configName.Name = "ConfigName"
+        configName.Size = UDim2.new(1, -20, 0, 30)
+        configName.Position = UDim2.new(0, 10, 0, 5)
+        configName.BackgroundTransparency = 1
+        configName.Text = name
+        configName.TextColor3 = Color3.fromRGB(255, 255, 255)
+        configName.TextSize = 16
+        configName.Font = Enum.Font.GothamSemibold
+        configName.TextXAlignment = Enum.TextXAlignment.Left
+        configName.Parent = configFrame
+        
+        local loadButton = Instance.new("TextButton")
+        loadButton.Name = "LoadButton"
+        loadButton.Size = UDim2.new(0.3, 0, 0, 25)
+        loadButton.Position = UDim2.new(0, 10, 0, 40)
+        loadButton.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
+        loadButton.BorderSizePixel = 0
+        loadButton.Text = "Load"
+        loadButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+        loadButton.TextSize = 14
+        loadButton.Font = Enum.Font.GothamSemibold
+        ApplyCorners(loadButton)
+        loadButton.Parent = configFrame
+        
+        local renameButton = Instance.new("TextButton")
+        renameButton.Name = "RenameButton"
+        renameButton.Size = UDim2.new(0.3, 0, 0, 25)
+        renameButton.Position = UDim2.new(0.35, 0, 0, 40)
+        renameButton.BackgroundColor3 = Color3.fromRGB(230, 126, 34)
+        renameButton.BorderSizePixel = 0
+        renameButton.Text = "Rename"
+        renameButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+        renameButton.TextSize = 14
+        renameButton.Font = Enum.Font.GothamSemibold
+        ApplyCorners(renameButton)
+        renameButton.Parent = configFrame
+        
+        local deleteButton = Instance.new("TextButton")
+        deleteButton.Name = "DeleteButton"
+        deleteButton.Size = UDim2.new(0.3, 0, 0, 25)
+        deleteButton.Position = UDim2.new(0.7, 0, 0, 40)
+        deleteButton.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+        deleteButton.BorderSizePixel = 0
+        deleteButton.Text = "Delete"
+        deleteButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+        deleteButton.TextSize = 14
+        deleteButton.Font = Enum.Font.GothamSemibold
+        ApplyCorners(deleteButton)
+        deleteButton.Parent = configFrame
+        
+        -- Button functions
+        loadButton.MouseButton1Click:Connect(function()
+            LoadConfiguration(name)
+            popup:Destroy()
+        end)
+        
+        renameButton.MouseButton1Click:Connect(function()
+            -- Create rename popup
+            local renamePopup, renameContent = CreatePopup("Rename Configuration", UDim2.new(0, 300, 0, 130))
+            
+            local renameInput = Instance.new("TextBox")
+            renameInput.Name = "RenameInput"
+            renameInput.Size = UDim2.new(0.9, 0, 0, 30)
+            renameInput.Position = UDim2.new(0.5, 0, 0, 20)
+            renameInput.AnchorPoint = Vector2.new(0.5, 0)
+            renameInput.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+            renameInput.BorderSizePixel = 0
+            renameInput.Text = name
+            renameInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+            renameInput.TextSize = 14
+            renameInput.Font = Enum.Font.Gotham
+            renameInput.PlaceholderText = "Enter new name..."
+            ApplyCorners(renameInput)
+            renameInput.Parent = renameContent
+            
+            local confirmButton = Instance.new("TextButton")
+            confirmButton.Name = "ConfirmButton"
+            confirmButton.Size = UDim2.new(0.9, 0, 0, 30)
+            confirmButton.Position = UDim2.new(0.5, 0, 0, 60)
+            confirmButton.AnchorPoint = Vector2.new(0.5, 0)
+            confirmButton.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+            confirmButton.BorderSizePixel = 0
+            confirmButton.Text = "Confirm"
+            confirmButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+            confirmButton.TextSize = 14
+            confirmButton.Font = Enum.Font.GothamSemibold
+            ApplyCorners(confirmButton)
+            confirmButton.Parent = renameContent
+            
+            confirmButton.MouseButton1Click:Connect(function()
+                local newName = renameInput.Text
+                if newName and newName ~= "" then
+                    savedConfigs[newName] = savedConfigs[name]
+                    savedConfigs[name] = nil
+                    
+                    if currentConfigName == name then
+                        currentConfigName = newName
+                        Title.Text = "Locations: " .. currentConfigName
+                    end
+                    
+                    renamePopup:Destroy()
+                    popup:Destroy()
+                    ShowManageConfigsDialog()
+                end
+            end)
+        end)
+        
+        deleteButton.MouseButton1Click:Connect(function()
+            -- Create confirmation popup
+            local confirmPopup, confirmContent = CreatePopup("Confirm Deletion", UDim2.new(0, 300, 0, 130))
+            
+            local confirmText = Instance.new("TextLabel")
+            confirmText.Name = "ConfirmText"
+            confirmText.Size = UDim2.new(0.9, 0, 0, 40)
+            confirmText.Position = UDim2.new(0.5, 0, 0, 10)
+            confirmText.AnchorPoint = Vector2.new(0.5, 0)
+            confirmText.BackgroundTransparency = 1
+            confirmText.Text = "Are you sure you want to delete \"" .. name .. "\"?"
+            confirmText.TextColor3 = Color3.fromRGB(255, 255, 255)
+            confirmText.TextSize = 14
+            confirmText.TextWrapped = true
+            confirmText.Font = Enum.Font.GothamSemibold
+            confirmText.Parent = confirmContent
+            
+            local yesButton = Instance.new("TextButton")
+            yesButton.Name = "YesButton"
+            yesButton.Size = UDim2.new(0.45, 0, 0, 30)
+            yesButton.Position = UDim2.new(0.25, 0, 0, 60)
+            yesButton.AnchorPoint = Vector2.new(0.5, 0)
+            yesButton.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+            yesButton.BorderSizePixel = 0
+            yesButton.Text = "Yes, Delete"
+            yesButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+            yesButton.TextSize = 14
+            yesButton.Font = Enum.Font.GothamSemibold
+            ApplyCorners(yesButton)
+            yesButton.Parent = confirmContent
+            
+            local noButton = Instance.new("TextButton")
+            noButton.Name = "NoButton"
+            noButton.Size = UDim2.new(0.45, 0, 0, 30)
+            noButton.Position = UDim2.new(0.75, 0, 0, 60)
+            noButton.AnchorPoint = Vector2.new(0.5, 0)
+            noButton.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
+            noButton.BorderSizePixel = 0
+            noButton.Text = "Cancel"
+            noButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+            noButton.TextSize = 14
+            noButton.Font = Enum.Font.GothamSemibold
+            ApplyCorners(noButton)
+            noButton.Parent = confirmContent
+            
+            yesButton.MouseButton1Click:Connect(function()
+                savedConfigs[name] = nil
+                
+                if currentConfigName == name then
+                    currentConfigName = "Default"
+                    savedLocations = {}
+                    UpdateLocationsList()
+                end
+                
+                confirmPopup:Destroy()
+                popup:Destroy()
+                ShowManageConfigsDialog()
+            end)
+            
+            noButton.MouseButton1Click:Connect(function()
+                confirmPopup:Destroy()
+            end)
+        end)
+        
+        configFrame.Parent = configsScrollFrame
+        yOffset = yOffset + 75
+    end
+    
+    configsScrollFrame.CanvasSize = UDim2.new(0, 0, 0, math.max(yOffset, configsScrollFrame.AbsoluteSize.Y))
+    
+    -- If no configs
+    if yOffset == 0 then
+        local noConfigsLabel = Instance.new("TextLabel")
+        noConfigsLabel.Size = UDim2.new(0.9, 0, 0, 40)
+        noConfigsLabel.Position = UDim2.new(0.5, 0, 0, 50)
+        noConfigsLabel.AnchorPoint = Vector2.new(0.5, 0)
+        noConfigsLabel.BackgroundTransparency = 1
+        noConfigsLabel.Text = "No saved configurations"
+        noConfigsLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        noConfigsLabel.TextSize = 16
+        noConfigsLabel.Font = Enum.Font.GothamSemibold
+        noConfigsLabel.Parent = content
+    end
+end
+
+-- Save button functionality
+SaveButton.MouseButton1Click:Connect(function()
+    local character = Player.Character or Player.CharacterAdded:Wait()
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    
+    if humanoidRootPart then
+        -- Create name prompt
+        local namePromptFrame = Instance.new("Frame")
+        namePromptFrame.Name = "NamePromptFrame"
+        namePromptFrame.Size = UDim2.new(0, 250, 0, 120)
+        namePromptFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+        namePromptFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+        namePromptFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        namePromptFrame.BorderSizePixel = 0
+        ApplyCorners(namePromptFrame)
+        namePromptFrame.Parent = ScreenGui
+        
+        local promptTitle = Instance.new("TextLabel")
+        promptTitle.Name = "PromptTitle"
+        promptTitle.Size = UDim2.new(1, 0, 0, 30)
+        promptTitle.BackgroundTransparency = 1
+        promptTitle.Text = "Name Your Location"
+        promptTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+        promptTitle.TextSize = 16
+        promptTitle.Font = Enum.Font.GothamBold
+        promptTitle.Parent = namePromptFrame
+        
+        local nameInput = Instance.new("TextBox")
+        nameInput.Name = "NameInput"
+        nameInput.Size = UDim2.new(0.9, 0, 0, 30)
+        nameInput.Position = UDim2.new(0.5, 0, 0, 40)
+        nameInput.AnchorPoint = Vector2.new(0.5, 0)
+        nameInput.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        nameInput.BorderSizePixel = 0
+        nameInput.Text = "Location " .. (#savedLocations + 1)
+        nameInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+        nameInput.TextSize = 14
+        nameInput.Font = Enum.Font.Gotham
+        nameInput.PlaceholderText = "Enter location name..."
+        ApplyCorners(nameInput)
+        nameInput.Parent = namePromptFrame
+        
+        local saveConfirmButton = Instance.new("TextButton")
+        saveConfirmButton.Name = "SaveConfirmButton"
+        saveConfirmButton.Size = UDim2.new(0.45, 0, 0, 30)
+        saveConfirmButton.Position = UDim2.new(0.25, 0, 0, 80)
+        saveConfirmButton.AnchorPoint = Vector2.new(0.5, 0)
+        saveConfirmButton.BackgroundColor3 = Color3.fromRGB(0, 170, 127)
+        saveConfirmButton.BorderSizePixel = 0
+        saveConfirmButton.Text = "Save"
+        saveConfirmButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+        saveConfirmButton.TextSize = 14
+        saveConfirmButton.Font = Enum.Font.GothamSemibold
+        ApplyCorners(saveConfirmButton)
+        saveConfirmButton.Parent = namePromptFrame
+        
+        local cancelSaveButton = Instance.new("TextButton")
+        cancelSaveButton.Name = "CancelSaveButton"
+        cancelSaveButton.Size = UDim2.new(0.45, 0, 0, 30)
+        cancelSaveButton.Position = UDim2.new(0.75, 0, 0, 80)
+        cancelSaveButton.AnchorPoint = Vector2.new(0.5, 0)
+        cancelSaveButton.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+        cancelSaveButton.BorderSizePixel = 0
+        cancelSaveButton.Text = "Cancel"
+        cancelSaveButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+        cancelSaveButton.TextSize = 14
+        cancelSaveButton.Font = Enum.Font.GothamSemibold
+        ApplyCorners(cancelSaveButton)
+        cancelSaveButton.Parent = namePromptFrame
+        
+        saveConfirmButton.MouseButton1Click:Connect(function()
+            local locationName = nameInput.Text
+            if locationName and locationName ~= "" then
+                table.insert(savedLocations, {
+                    name = locationName,
+                    cframe = humanoidRootPart.CFrame
+                })
+                UpdateLocationsList()
+            end
+            namePromptFrame:Destroy()
+        end)
+        
+        cancelSaveButton.MouseButton1Click:Connect(function()
+            namePromptFrame:Destroy()
+        end)
+    end
+end)
+
+-- Config button functionality
+ConfigButton.MouseButton1Click:Connect(function()
+    ConfigPanel.Visible = not ConfigPanel.Visible
+end)
+
+-- Save Config button functionality
+SaveConfigButton.MouseButton1Click:Connect(function()
+    ShowSaveConfigDialog()
+    ConfigPanel.Visible = false
+end)
+
+-- Load Config button functionality
+LoadConfigButton.MouseButton1Click:Connect(function()
+    ShowLoadConfigDialog()
+    ConfigPanel.Visible = false
+end)
+
+-- Manage Configs button functionality
+ManageConfigsButton.MouseButton1Click:Connect(function()
+    ShowManageConfigsDialog()
+    ConfigPanel.Visible = false
+end)
+
+-- Minimize button functionality
+MinimizeButton.MouseButton1Click:Connect(function()
+    MainFrame.Visible = false
+    MinimizedButton.Visible = true
+end)
+
+-- Minimized button functionality
+MinimizedButton.MouseButton1Click:Connect(function()
+    MainFrame.Visible = true
+    MinimizedButton.Visible = false
+end)
+
+-- Toggle visibility with a key
+local isVisible = true
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed and input.KeyCode == Enum.KeyCode.P then  -- Change 'P' to any key you prefer
+        isVisible = not isVisible
+        MainFrame.Visible = isVisible
+        MinimizedButton.Visible = not isVisible and not MainFrame.Visible
+    end
+end)
+
+-- Initialize with default config
+SaveConfiguration("Default")
+UpdateLocationsList()
